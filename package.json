@@ -1,0 +1,7 @@
+{
+  "name": "clocked",
+  "private": true,
+  "description": "Clocked: guess the NFL player. Build tooling.",
+  "scripts": { "logos": "node scripts/render_logos.js", "build": "node scripts/render_logos.js && python3 scripts/build.py" },
+  "dependencies": { "nfl-team-logos": "1.5.0", "react": "19.2.0", "react-dom": "19.2.0" }
+}
