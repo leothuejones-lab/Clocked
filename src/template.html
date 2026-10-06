@@ -129,6 +129,8 @@ h1 .s i{display:inline-block;font-style:normal;transform:skewX(calc(var(--skew) 
 .mc button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mc button:focus-visible{outline:3px solid var(--chyron)}
 .mc-note{grid-column:1/-1;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.pcard .credit{position:absolute;left:50%;bottom:3px;transform:translateX(-50%);z-index:3;font-size:9px;font-weight:700;letter-spacing:.04em;color:rgba(255,255,255,.75);text-decoration:none;white-space:nowrap}
+.pcard .credit:hover{text-decoration:underline}
 .pcard .logo.hid img{visibility:hidden}
 .pcard .logo.hid{background:var(--slab);display:flex;align-items:center;justify-content:center}
 .pcard .logo.hid::after{content:"?";position:absolute;color:#fff;font-family:var(--display);font-weight:700;font-size:clamp(28px,8vw,46px);padding-top:6px}
@@ -201,6 +203,7 @@ h1 .s i{display:inline-block;font-style:normal;transform:skewX(calc(var(--skew) 
     <div class="bust" id="bust"></div>
     <div class="pos" id="pos"></div>
     <div class="nameplate" id="nameplate" hidden></div>
+    <a class="credit" id="credit" hidden target="_blank" rel="noopener">Photo: Wikimedia Commons</a>
     <div class="stamp" id="stamp" hidden></div>
   </div>
 
@@ -295,16 +298,32 @@ const SIL=`<svg viewBox="0 0 200 200" aria-hidden="true"><ellipse cx="100" cy="7
 const PN={act:'Active',ret:'Retired',week:'Last week'};
 let pool='act',mode='practice',ans,state;
 
-function photoChain(p){const e=p.espn?`https://a.espncdn.com/i/headshots/nfl/players/full/${p.espn}.png`:null,n=p.hs?p.hs.replace('/f_auto,q_auto/','/f_auto,q_auto,w_500/'):null;return (p.active===false?[n,e]:[e,n]).filter(Boolean)}
-function setPhoto(p){
-  const b=$('bust');b.innerHTML='';const urls=photoChain(p);let i=0;
-  const fallback=()=>{b.innerHTML=SIL+(state.done?'':'<span class="q">?</span>')};
-  if(!urls.length)return fallback();
-  const img=new Image();img.alt='';img.referrerPolicy='no-referrer';
-  img.onerror=()=>{i++;if(i<urls.length)img.src=urls[i];else fallback()};
-  img.onload=()=>{if(img.naturalWidth<40){img.onerror();return}b.innerHTML='';b.appendChild(img)};
-  img.src=urls[0];
+/* Photo sources. NFL.com serves a blank-helmet placeholder for most retired players, so its image is
+   checked first (placeholder = no color) and skipped if blank; then the Wikimedia Commons photo matched
+   to the player's PFR id at build time (p.wd). Images are loaded as blobs so the file name (which can
+   contain the player's name) never shows up as the image address. */
+const nflUrl=p=>p.hs?p.hs.replace('/f_auto,q_auto/','/f_auto,q_auto,w_500/'):null;
+const espnUrl=p=>p.espn?`https://a.espncdn.com/i/headshots/nfl/players/full/${p.espn}.png`:null;
+const wdName=p=>p.wd.split('/').pop();
+const wdUrl=p=>{if(!p.wd)return null;const f=encodeURIComponent(wdName(p));return 'https://upload.wikimedia.org/wikipedia/commons/thumb/'+p.wd.split('/').slice(0,2).join('/')+'/'+f+'/500px-'+f};
+function photoChain(p){const n={src:nflUrl(p),kind:'nfl'},e={src:espnUrl(p),kind:'espn'},w={src:wdUrl(p),kind:'wd'};return (p.active===false?[n,w,e]:[e,n,w]).filter(x=>x.src)}
+async function blankNfl(p){try{const b=await fetch(p.hs.replace('/f_auto,q_auto/','/f_png,q_auto,w_48/')).then(r=>{if(!r.ok)throw 0;return r.blob()});const bm=await createImageBitmap(b);const c=document.createElement('canvas');c.width=24;c.height=18;const x=c.getContext('2d');x.drawImage(bm,0,0,24,18);const d=x.getImageData(0,0,24,18).data;let t=0;for(let i=0;i<d.length;i+=4)t+=Math.max(d[i],d[i+1],d[i+2])-Math.min(d[i],d[i+1],d[i+2]);return t/(d.length/4)<4}catch(e){return false}}
+async function asBlobUrl(u){const r=await fetch(u);if(!r.ok)throw 0;return URL.createObjectURL(await r.blob())}
+let photoSeq=0,photoCredit=null;
+async function setPhoto(p){
+  const seq=++photoSeq,b=$('bust');b.innerHTML='';photoCredit=null;paintCredit();
+  const fallback=()=>{if(seq===photoSeq)b.innerHTML=SIL+(state.done?'':'<span class="q">?</span>')};
+  for(const s of photoChain(p)){
+    if(seq!==photoSeq)return;
+    if(s.kind==='nfl'&&p.active===false&&await blankNfl(p))continue;
+    let src=s.src;if(s.kind==='wd'){try{src=await asBlobUrl(s.src)}catch(e){src='https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(wdName(p))+'?width=500'}}
+    const ok=await new Promise(r=>{const img=new Image();img.alt='';img.referrerPolicy='no-referrer';img.onload=()=>r(img.naturalWidth>=40?img:null);img.onerror=()=>r(null);img.src=src});
+    if(seq!==photoSeq)return;
+    if(ok){b.innerHTML='';b.appendChild(ok);photoCredit=s.kind==='wd'?wdName(p):null;paintCredit();return}
+  }
+  fallback();
 }
+function paintCredit(){const c=$('credit');if(!c)return;const on=!!(photoCredit&&state&&state.done);c.hidden=!on;if(on)c.href='https://commons.wikimedia.org/wiki/File:'+encodeURIComponent(photoCredit)}
 function load(){
   const d=dayIdx();
   CLUES=pool==='week'?WEEKC:CAREER;
@@ -361,7 +380,7 @@ function render(fresh){
   if(mode==='special')paintLimits();
   const card=$('card');card.className='pcard '+(state.done?'s3':w>=5?'s2':w>=3?'s1':'s0');
   const q=$('bust').querySelector('.q');if(q&&state.done)q.remove();
-  $('nameplate').hidden=!state.done;$('nameplate').textContent=ans.name;
+  $('nameplate').hidden=!state.done;$('nameplate').textContent=ans.name;paintCredit();
   const stp=$('stamp');stp.hidden=!state.done;if(state.done){stp.textContent=state.won?(state.guesses.length===1?'Instant':'Clocked'):'Juked';stp.className='stamp'+(state.won?'':' l')}
   $('clues').innerHTML=CLUES.map((c,i)=>`<div class="clue${i===fresh?' fresh':''}"><div class="k">${c[0]}</div><div class="v">${i<shown?c[1](ans):`<div class="locked">After ${i-st0+1} wrong</div>`}</div></div>`).join('');
   $('pips').innerHTML=Array.from({length:MAX},(_,i)=>{const g=state.guesses[i];return`<span class="pip ${g===undefined?'':g===ans.id?'win':'used'}${i===popAt?' pop':''}"></span>`}).join('');
