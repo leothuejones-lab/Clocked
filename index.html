@@ -1,3 +1,6 @@
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Clocked</title>
@@ -184,7 +187,8 @@ h1 .s i{display:inline-block;font-style:normal;transform:skewX(calc(var(--skew) 
 #skip{margin-right:4px}
 .pips{padding-right:1px}
 </style>
-
+</head>
+<body>
 <div class="wrap">
   <header>
     <div class="top"><h1>Clock<span class="s"><i>ed</i></span></h1></div>
@@ -584,3 +588,5 @@ window.addEventListener('hashchange',()=>location.reload());
 if(location.hash==='#special'||CHID){prePool=pool;preDiff=diff;mode='special';$('mDaily').setAttribute('aria-pressed',false);$('mPrac').setAttribute('aria-pressed',false)}
 load();
 </script>
+</body>
+</html>
