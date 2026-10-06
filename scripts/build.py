@@ -55,10 +55,32 @@ logs = []
 for y in range(1999, SEASON + 1):
     f = fetch(f'{REL}stats_player/stats_player_week_{y}.csv', f'stats_week_{y}.csv', refresh=(y >= SEASON - 1))
     logs.append(pd.read_csv(f, low_memory=False, usecols=lambda c: c in SCOLS))
-ps_all = pd.concat(logs)
+ps_all = pd.concat(logs, ignore_index=True)
+
+def repair_teams(x):
+    """nflverse bug: in some games (every 2001-02 Jaguars game) all players are tagged with the SAME team,
+    so one roster gets the opponent's name. Detect games where only one team label appears and re-assign
+    each player to whichever of the two teams he actually played for that season."""
+    gt = x.groupby('game_id').team.nunique()
+    broken = set(gt[gt == 1].index)
+    if not broken: return x, 0
+    isb = x.game_id.isin(broken)
+    good = x[~isb].groupby(['player_id', 'season', 'team']).size()
+    bt = x[isb].groupby(['player_id', 'season', 'team']).size()
+    bo = x[isb].groupby(['player_id', 'season', 'opponent_team']).size()
+    def score(pid, se, t):
+        return 10 * good.get((pid, se, t), 0) + bo.get((pid, se, t), 0) + bt.get((pid, se, t), 0)
+    idx = x.index[isb]; fixed = 0
+    for i, pid, se, t, o in zip(idx, x.loc[idx, 'player_id'], x.loc[idx, 'season'], x.loc[idx, 'team'], x.loc[idx, 'opponent_team']):
+        if score(pid, se, o) > score(pid, se, t):
+            x.at[i, 'team'], x.at[i, 'opponent_team'] = o, t; fixed += 1
+    return x, fixed
+
+ps_all, nfix = repair_teams(ps_all)
 ps = ps_all[ps_all.season_type == 'REG']
 WEEK = int(ps[ps.season == SEASON].week.max()) if (ps.season == SEASON).any() else 0
 log(f'   season {SEASON}, game logs through week {WEEK}')
+log(f'   repaired {nfix} mislabeled team rows in source game logs')
 
 # ---------- 2. find which week PFR's career totals run through ----------
 log('2/6 matching PFR totals to game logs')
@@ -152,12 +174,12 @@ late = late_df.groupby('player_id')[LATE_COLS].sum()
 LATEG = late_df.groupby('player_id').size().to_dict()
 
 def num(v): return int(round(v)) if float(v).is_integer() else round(float(v), 1)
-def stats(p):
+def stats(p, pos=None):
     def S(f, lf):
         v = 0 if pd.isna(p[f]) else p[f]
         if p.gsis_id in late.index: v += late.loc[p.gsis_id, lf]
         return num(v)
-    g = POS[p.position]
+    g = POS[pos or p.position]
     if g == 'QB': return [['Pass Yds', S('pass_yards', 'passing_yards')], ['Pass TD', S('pass_tds', 'passing_tds')], ['INT', S('pass_ints', 'passing_interceptions')], ['Rush Yds', S('rush_yards', 'rushing_yards')]]
     if g == 'RB': return [['Rush Yds', S('rush_yards', 'rushing_yards')], ['Rush TD', S('rush_tds', 'rushing_tds')], ['Rec', S('receptions', 'receptions')], ['Rec Yds', S('rec_yards', 'receiving_yards')]]
     if g in ('WR', 'TE'): return [['Rec', S('receptions', 'receptions')], ['Rec Yds', S('rec_yards', 'receiving_yards')], ['Rec TD', S('rec_tds', 'receiving_tds')]]
@@ -171,11 +193,22 @@ HS = {g: h for g, h in zip(pl.gsis_id, pl.headshot) if isinstance(h, str)}
 lastgame = ps.groupby('player_id').season.max().to_dict()
 
 dd = d[d.position.isin(POS) & d.gsis_id.notna()].drop_duplicates('gsis_id')
+# PFR's draft listing is the position a player was DRAFTED at (Hester = DB, Waller = WR). Where game logs show he
+# mostly played somewhere else, use that. DE/OLB swaps are left alone (edge rushers, either label is fair).
+LOGPOS = ps[ps.position.notna()].groupby('player_id').position.agg(lambda s: s.value_counts().index[0]).to_dict()
+def real_pos(g, drafted):
+    lp = LOGPOS.get(g)
+    if lp in ('K', 'P', 'LS'): return None            # specialists: stat clue would be meaningless
+    if lp not in POS or POS[lp] == POS[drafted]: return drafted
+    if {POS[lp], POS[drafted]} == {'DL', 'LB'}: return drafted
+    return lp
 allp, act_ids, ret_ids = [], [], []
 for _, p in dd.iterrows():
     tm = teams(p.gsis_id)
     if not tm: continue
     g = p.gsis_id; active = g in ACTIVE
+    rp = real_pos(g, p.position)
+    if rp is None: continue
     gp = (0 if pd.isna(p.games) else int(p.games)) + LATEG.get(g, 0)
     if gp < 16 and not active: continue
     if active:
@@ -187,10 +220,10 @@ for _, p in dd.iterrows():
         for t in tm: span[t[0]] += t[2] - t[1] + 1
         logo_team = span.most_common(1)[0][0]
     hs = HSNOW.get(g) if active else HS.get(g)
-    rec = dict(id=g, name=p.pfr_player_name, pos=p.position, pg=POS[p.position], active=active,
+    rec = dict(id=g, name=p.pfr_player_name, pos=rp, pg=POS[rp], active=active,
                yrs=[min(t[1] for t in tm), SEASON if active else max(t[2] for t in tm)], games=gp, college=p.college,
                draft=[int(p.season), int(p['round']), int(p.pick), team(p.team, p.season)], pb=int(p.probowls), ap=int(p.allpro),
-               hof=bool(p.hof), stats=stats(p), teams=tm, logo=LOGO[logo_team], pfr=p.pfr_player_id, espn=ESPN.get(g),
+               hof=bool(p.hof), stats=stats(p, rp), teams=tm, logo=LOGO[logo_team], pfr=p.pfr_player_id, espn=ESPN.get(g),
                hs=hs if isinstance(hs, str) else None)
     allp.append(rec)
     if active and (p.probowls >= 1 or p.allpro >= 1): act_ids.append(g)
