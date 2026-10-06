@@ -41,6 +41,14 @@ h1 .s i{display:inline-block;font-style:normal;transform:skewX(calc(var(--skew) 
 .tabs button{position:relative;font:700 15px var(--body);text-transform:uppercase;letter-spacing:.04em;border:0;background:transparent;color:var(--chalk);opacity:.6;padding:8px 12px 10px;cursor:pointer}
 .tabs button[aria-pressed="true"]{opacity:1}
 .tabs button[aria-pressed="true"]::after{content:"";position:absolute;left:6px;right:6px;bottom:-2px;height:4px;background:var(--chyron);transform:skewX(var(--skew))}
+.special{display:flex;align-items:center;gap:10px;width:100%;border:0;cursor:pointer;background:var(--chyron);color:var(--ink);padding:9px 14px 8px;transform:skewX(var(--skew));box-shadow:0 4px 0 var(--chyron-dk);text-align:left;font:800 13px var(--body);letter-spacing:.06em;text-transform:uppercase;transition:transform .06s,box-shadow .06s}
+.special>span{display:flex;align-items:center;gap:10px;width:100%;transform:skewX(calc(var(--skew) * -1));min-width:0}
+.special b{font-family:var(--display);font-weight:600;font-size:24px;line-height:1;padding-top:3px;letter-spacing:.02em;white-space:nowrap}
+.special em{font-style:normal;opacity:.75;flex:1;min-width:0;line-height:1.15;font-size:12px}
+.special i{font-style:normal;white-space:nowrap;font-size:18px;line-height:1}
+.special:active{transform:skewX(var(--skew)) translateY(3px);box-shadow:0 1px 0 var(--chyron-dk)}
+.special.on{background:var(--paper)}
+.special:focus-visible{outline:3px solid var(--paper);outline-offset:2px}
 .subs{display:flex;justify-content:space-between;gap:8px 10px;flex-wrap:wrap;padding-top:2px}
 .seg{display:flex;gap:4px}
 .seg button{font:700 12px var(--body);text-transform:uppercase;letter-spacing:.05em;border:1.5px solid rgba(255,255,255,.28);background:transparent;color:var(--chalk);padding:5px 10px;cursor:pointer;transform:skewX(var(--skew));transition:background .15s,color .15s,border-color .15s}
@@ -173,6 +181,7 @@ h1 .s i{display:inline-block;font-style:normal;transform:skewX(calc(var(--skew) 
   <header>
     <div class="top"><h1>Clock<span class="s"><i>ed</i></span></h1></div>
     <div class="tabs" role="group" aria-label="Player pool"><button id="pAct" aria-pressed="true">Active</button><button id="pRet" aria-pressed="false">Retired</button><button id="pWk" aria-pressed="false">Last week</button></div>
+    <button class="special" id="specialBtn" type="button"><span><b id="spNum">Daily Special</b><em id="spTheme"></em><i id="spGo">&rarr;</i></span></button>
     <div class="subs">
       <div class="seg" role="group" aria-label="Difficulty" id="diffSeg"><button data-d="easy"><span>Easy</span></button><button data-d="medium"><span>Medium</span></button><button data-d="hard"><span>Hard</span></button><button data-d="die"><span>Diehard</span></button></div>
       <div class="seg" role="group" aria-label="Mode"><button id="mPrac" aria-pressed="true"><span>Random</span></button><button id="mDaily" aria-pressed="false"><span>Daily</span></button></div>
@@ -259,6 +268,15 @@ const SEEDS={act:2026,ret:1985,week:404},DSEED={easy:11,medium:22,hard:33,die:44
 function poolIds(){return pool==='week'?WKSORT.slice(0,DIFF[diff].wk):POOLS[pool].filter(id=>DIFF[diff][pool](A[id]))}
 function poolOrder(){return shuffled(poolIds(),SEEDS[pool]*100+DSEED[diff])}
 const SK=()=>'mp2-'+pool+'-'+diff;
+/* ---- Daily Special: one shared puzzle per day (Eastern time), themed by weekday, free to play ---- */
+DIFF.special={label:'Special',act:p=>p.pb>=3,ret:p=>p.hof||p.pb>=5,wk:50,start:1,mc:3,logo:true};
+const SP_THEMES=[['act','Sunday Star',1],['act','Monday Mystery',1],['act','Tuesday Mystery',1],['week','Last Week Line',1],['ret','Throwback Thursday',1],['act','College Friday',2],['act','Saturday Showdown',1]];
+function fnv(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function etDate(){try{return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York'}).format(new Date())}catch(e){return new Date().toISOString().slice(0,10)}}
+function specialInfo(){const s=etDate(),dt=new Date(s+'T12:00:00Z'),day=Math.max(0,Math.round((dt-Date.UTC(2026,9,5,12))/864e5)),t=SP_THEMES[dt.getUTCDay()];return{day,num:day+1,pool:t[0],theme:t[1],start:t[2]}}
+let prePool='act',preDiff='medium';
+function paintSpecial(){const sp=specialInfo();$('spNum').textContent='Daily Special #'+sp.num;$('spTheme').textContent=sp.theme;$('spGo').innerHTML=mode==='special'?'&#10003;':'&rarr;';$('specialBtn').classList.toggle('on',mode==='special')}
+function exitSpecial(){if(mode!=='special')return;mode='practice';diff=preDiff;pool=prePool;$('mPrac').setAttribute('aria-pressed',true);$('mDaily').setAttribute('aria-pressed',false);try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
 let CLUES=CAREER;
 const SIL=`<svg viewBox="0 0 200 200" aria-hidden="true"><ellipse cx="100" cy="72" rx="34" ry="41"/><path d="M100 120c-14 0-26-4-33-10l-6 10c-28 6-48 20-55 40l-4 40h196l-4-40c-7-20-27-34-55-40l-6-10c-7 6-19 10-33 10z"/></svg>`;
 const PN={act:'Active',ret:'Retired',week:'Last week'};
@@ -279,7 +297,15 @@ function load(){
   CLUES=pool==='week'?WEEKC:CAREER;
   const get=k=>pool==='week'?WK[k]:A[k];
   ['card','clues','guesses'].forEach(id=>$(id).hidden=false);
-  if(mode==='daily'){
+  if(mode==='special'){
+    const sp=specialInfo();pool=sp.pool;diff='special';DIFF.special.start=sp.start;
+    CLUES=pool==='week'?WEEKC:CAREER;
+    const ids=pool==='week'?WKSORT.slice(0,DIFF.special.wk):POOLS[pool].filter(id=>DIFF.special[pool](A[id]));
+    /* rendezvous pick: stays the same player all day even if the weekly update reshuffles the pool */
+    let best=null,bh=-1;for(const id of ids){const k=pool==='week'?WK[id].id+'|'+WK[id].line.join(','):id;const h=fnv(k+'#'+sp.day);if(h>bh){bh=h;best=id}}ans=(pool==='week'?WK:A)[best];
+    const s=store.get('clk-special');state=(s&&s.day===sp.day)?s:{day:sp.day,guesses:[],done:false,won:false};
+    $('title').textContent=`Daily Special #${sp.num} · ${sp.theme}`;
+  }else if(mode==='daily'){
     const ord=poolOrder();ans=get(ord[d%ord.length]);
     const s=store.get(SK());state=(s&&s.day===d)?s:{day:d,guesses:[],done:false,won:false};
 
@@ -298,10 +324,11 @@ function load(){
   }
   const lg=LOGOS[ans.logo];
   $('card').style.setProperty('--team',lg.c1);$('card').style.setProperty('--team2',lg.c2);
-  $('logo').src=lg.img;$('logo').parentElement.classList.toggle('hid',!DIFF[diff].logo);$('pos').textContent=ans.pos;$('tag').textContent=pool==='week'?'Week '+DATA.W.week:PN[pool];
-  setPhoto(ans);render(-1);paintLimits();
+  $('logo').src=lg.img;$('logo').parentElement.classList.toggle('hid',!DIFF[diff].logo);$('pos').textContent=ans.pos;$('tag').textContent=mode==='special'?'Daily Special':pool==='week'?'Week '+DATA.W.week:PN[pool];
+  ['pAct','pRet','pWk'].forEach(i=>$(i).setAttribute('aria-pressed',mode!=='special'&&({pAct:'act',pRet:'ret',pWk:'week'})[i]===pool));
+  setPhoto(ans);render(-1);paintLimits();paintSpecial();paintDiff();
 }
-function save(){if(mode==='daily')store.set(SK(),state);else{const c=store.get(CK());if(c){c.state=state;store.set(CK(),c)}}}
+function save(){if(mode==='special')store.set('clk-special',state);else if(mode==='daily')store.set(SK(),state);else{const c=store.get(CK());if(c){c.state=state;store.set(CK(),c)}}}
 function wrongs(){return state.guesses.filter(g=>g!==ans.id).length}
 let popAt=-1;
 function replay(el,c){el.classList.remove(c);void el.offsetWidth;el.classList.add(c)}
@@ -331,11 +358,11 @@ function render(fresh){
     const tms=pool==='week'?OPP[ans.team]:[...new Set(ans.teams.map(t=>t[0]))].join(', ');
     res.innerHTML=`<div class="rhead"><span class="rtag">${state.won?'Clocked':'Juked'}</span><span class="rscore">${state.won?n:'X'}/${MAX}</span></div>
       <div class="rname">${ans.name}</div>
-      <div class="sm">${POSNAME[ans.pos]||ans.pos} · ${tms}${mode==='daily'?' · '+streak():''}</div>
+      <div class="sm">${POSNAME[ans.pos]||ans.pos} · ${tms}${mode!=='practice'?' · '+streak():''}</div>
       <div class="actions"><button class="btn ghost" id="share"><span>Copy text</span></button>
         <a class="btn x" id="postX" href="${tweetURL()}" target="_blank" rel="noopener"><span>Post to X</span></a>
         <button class="btn ghost" id="graphic"><span>Get graphic</span></button>
-        ${mode==='daily'?'<button class="btn ghost" id="toPrac"><span>Play random</span></button>':'<button class="btn" id="next"><span>Next player</span></button>'}</div>
+        ${mode!=='practice'?'<button class="btn ghost" id="toPrac"><span>Play random</span></button>':'<button class="btn" id="next"><span>Next player</span></button>'}</div>
       ${ans.pfr?`<a href="https://www.pro-football-reference.com/players/${ans.pfr[0]}/${ans.pfr}.htm" target="_blank" rel="noopener" class="sm" style="font-weight:800;color:var(--turf)">Full career on Pro Football Reference</a>`:''}`;
     $('graphic').onclick=()=>showGraphic('result');$('postX').onclick=()=>copyGraphic('result',true);
     $('share')&&($('share').onclick=share);$('toPrac')&&($('toPrac').onclick=()=>setMode('practice'));$('next')&&($('next').onclick=()=>{store.set(CK(),null);load()});
@@ -350,14 +377,14 @@ function mcOptions(){
   cands=[...new Set(cands)].filter(id=>id!==ans.id&&!state.guesses.includes(id)&&LBY[id]);
   const pick=[];while(pick.length<3&&cands.length){pick.push(cands.splice(Math.floor(r()*cands.length),1)[0])}
   const all=pick.concat([ans.id]);for(let i=all.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[all[i],all[j]]=[all[j],all[i]]}return all}
-function streak(){const s=store.get('mp2-stats-'+pool+'-'+diff);return s?`Streak ${s.streak} · Played ${s.played}`:''}
+function streak(){const s=store.get(mode==='special'?'clk-special-stats':'mp2-stats-'+pool+'-'+diff);return s?`Streak ${s.streak} · Played ${s.played}`:''}
 function finish(won){state.done=true;state.won=won;
-  if(mode==='daily'){const k='mp2-stats-'+pool+'-'+diff,s=store.get(k)||{played:0,wins:0,streak:0};
+  if(mode!=='practice'){const k=mode==='special'?'clk-special-stats':'mp2-stats-'+pool+'-'+diff,s=store.get(k)||{played:0,wins:0,streak:0};
     if(s.lastDay!==state.day){s.played++;if(won){s.wins++;s.streak=s.lastWin===state.day-1?s.streak+1:1;s.lastWin=state.day}else s.streak=0;s.lastDay=state.day;store.set(k,s)}}}
 function submit(id){
   if(state.done||!id)return;
   if(id!=='skip'&&state.guesses.includes(id)){toast('Already guessed');return}
-  if(!state.guesses.length)count(mode==='daily'?'daily-'+diff:'r-'+(ans.key||ans.id)+'-'+diff);
+  if(!state.guesses.length&&mode!=='special')count(mode==='daily'?'daily-'+diff:'r-'+(ans.key||ans.id)+'-'+diff);
   state.guesses.push(id);popAt=state.guesses.length-1;
   if(id===ans.id)finish(true);else if(state.guesses.length>=MAX)finish(false);
   save();render(state.done?-1:Math.min(CLUES.length-1,DIFF[diff].start-1+wrongs()));popAt=-1;paintLimits();$('guess').value='';closeSugg();
@@ -368,12 +395,15 @@ let showName=store.get('clk-showname2')===true;
 const SHARE_URL='https://clocked-4tn.pages.dev';
 function shareText(){
   const cells=state.guesses.map(g=>g===ans.id?'🟩':g==='skip'?'⬜':'🟥').join('');
+  if(mode==='special'){const sp=specialInfo();return `Clocked Daily Special #${sp.num} ⏱️ ${sp.theme}\n${state.won?state.guesses.length:'X'}/${MAX} ${cells}`}
   const tag=mode==='daily'?`Daily #${state.day+1}`:'';
   const who=showName&&state.done?(state.won?`I clocked ${ans.name} in ${state.guesses.length}/${MAX}`:`${ans.name} juked me`):`${state.won?state.guesses.length:'X'}/${MAX}`;
   return `Clocked ⏱️ ${PN[pool]} · ${DIFF[diff].label} ${tag}\n${who} ${cells}`}
-function tweetURL(){return 'https://twitter.com/intent/tweet?text='+encodeURIComponent(shareText()+(SHARE_URL?'\n\n'+SHARE_URL:''))}
+function linkURL(){return SHARE_URL?SHARE_URL+(mode==='special'?'/#special':''):''}
+function tweetURL(){return 'https://twitter.com/intent/tweet?text='+encodeURIComponent(shareText()+(linkURL()?'\n\n'+linkURL():''))}
+function specialTweetURL(){const sp=specialInfo();return 'https://twitter.com/intent/tweet?text='+encodeURIComponent(`Today's Clocked Daily Special #${sp.num} ⏱️ ${sp.theme}\nCan you clock him? 👇`+(linkURL()?'\n\n'+linkURL():''))}
 function copyText(t,msg){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>toast(msg),()=>toast(t));else toast(t)}
-function share(){copyText(shareText()+(SHARE_URL?'\n'+SHARE_URL:''),'Result copied')}
+function share(){copyText(shareText()+(linkURL()?'\n'+linkURL():''),'Result copied')}
 let tt;function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400)}
 
 const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'');
@@ -412,7 +442,7 @@ function CK(){return 'clk-cur-'+pool+'-'+diff}
 function cnt(pl){const d=dayIdx(),c=store.get('clk-cnt-'+(pl||pool));return c&&c.day===d?c:{day:d,seen:[]}}
 function count(tag){const c=cnt();if(!c.seen.includes(tag)){c.seen.push(tag);store.set('clk-cnt-'+pool,c)}}
 function left(pl){return Math.max(0,LIMIT-cnt(pl).seen.length)}
-function paintLimits(){const n=left();$('left').textContent=`${n} of ${LIMIT} ${PN[pool]} players left today`+(mode==='daily'?' · daily':'')}
+function paintLimits(){if(mode==='special'){$('left').textContent='Daily Special · free, doesn\'t use your 6';return}const n=left();$('left').textContent=`${n} of ${LIMIT} ${PN[pool]} players left today`+(mode==='daily'?' · daily':'')}
 function showLimit(){
   ['card','clues','guesses','play','mc'].forEach(id=>$(id).hidden=true);
   $('title').textContent=`${PN[pool]} · ${DIFF[diff].label} · Random`;
@@ -443,7 +473,7 @@ async function drawGraphic(kind){
   c.textBaseline='alphabetic';c.font='700 96px Teko, Arial Narrow, sans-serif';c.fillStyle='#F2F5EF';c.fillText('CLOCK',60,128);
   const cw=c.measureText('CLOCK').width;slab(c,60+cw+6,52,112,86,'#FFD23F');c.fillStyle='#101C15';c.fillText('ED',60+cw+22,128);
   c.font='800 22px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.75)';c.textAlign='right';
-  c.fillText((PN[pool]+' · '+DIFF[diff].label+(mode==='daily'?' · Daily #'+((state.day||0)+1):' · Random')).toUpperCase(),W-60,110);c.textAlign='left';
+  c.fillText((mode==='special'?'Daily Special #'+specialInfo().num+' · '+specialInfo().theme:PN[pool]+' · '+DIFF[diff].label+(mode==='daily'?' · Daily #'+((state.day||0)+1):' · Random')).toUpperCase(),W-60,110);c.textAlign='left';
   // card
   const lg=LOGOS[ans.logo],X=60,Y=170,CW=620,CH=440;
   c.save();rr(c,X,Y,CW,CH,26);c.clip();c.fillStyle=lg.c1;c.fillRect(X,Y,CW,CH);
@@ -477,7 +507,7 @@ async function drawGraphic(kind){
     c.fillStyle='#F2F5EF';c.font='600 46px Teko, Arial Narrow, sans-serif';
     const items=pool==='week'?ans.line:st.map(s=>fmt(s[1])+' '+s[0]);
     let lx=RX;items.slice(0,4).forEach((t,i)=>{const w=c.measureText(t).width;if(lx+w>W-50){lx=RX;y+=50}c.fillText(t,lx,y);lx+=w+26});
-    c.font='600 26px Archivo, Arial, sans-serif';c.fillStyle='#FFD23F';c.fillText('Reply with your guess',RX,y+70);
+    c.font='600 26px Archivo, Arial, sans-serif';c.fillStyle='#FFD23F';c.fillText(mode==='special'?'Play it at '+(SHARE_URL||'Clocked').replace(/^https?:\/\//,''):'Reply with your guess',RX,y+70);
   }
   return cv;
 }
@@ -485,8 +515,9 @@ async function showGraphic(kind,note){
   const cv=await drawGraphic(kind);const url=cv.toDataURL('image/png');
   openSheet(`<h3>${kind==='result'?'Your result':'Who is this?'}</h3>${note?`<div style="font-weight:700">${note}</div>`:''}<img src="${url}" alt="Clocked graphic">
    <div class="sm">${kind==='result'?'':'Post this, let people guess in the replies, then drop the answer. '}If Copy doesn't work, right-click or long-press the image to save it, then attach it to your post.</div>
-   <div class="actions"><button class="btn" id="copyImg"><span>Copy image</span></button>${kind==='result'?`<a class="btn x" id="postX2" href="${tweetURL()}" target="_blank" rel="noopener"><span>Post to X</span></a><button class="btn ghost" id="nameTog"><span>${showName?'Hide name':'Show name'}</span></button>`:''}<button class="btn ghost" data-close><span>Close</span></button></div>`);
+   <div class="actions"><button class="btn" id="copyImg"><span>Copy image</span></button>${kind==='result'?`<a class="btn x" id="postX2" href="${tweetURL()}" target="_blank" rel="noopener"><span>Post to X</span></a><button class="btn ghost" id="nameTog"><span>${showName?'Hide name':'Show name'}</span></button>`:mode==='special'?`<a class="btn x" id="postSp" href="${specialTweetURL()}" target="_blank" rel="noopener"><span>Post to X</span></a>`:''}<button class="btn ghost" data-close><span>Close</span></button></div>`);
   $('copyImg').onclick=()=>copyGraphic(kind,false);
+  if($('postSp'))$('postSp').onclick=()=>copyGraphic('challenge',true);
   if(kind==='result'){$('postX2').onclick=()=>copyGraphic('result',true);$('nameTog').onclick=()=>{showName=!showName;store.set('clk-showname2',showName);if($('postX'))$('postX').href=tweetURL();showGraphic('result')}}
 }
 function copyGraphic(kind,posting){
@@ -497,12 +528,14 @@ function copyGraphic(kind,posting){
   }catch(e){fail()}
 }
 $('challenge').onclick=()=>showGraphic('challenge');
-function setPool(p){pool=p;if(mode==='practice'&&!canPractice())mode='daily',$('mDaily').setAttribute('aria-pressed',true),$('mPrac').setAttribute('aria-pressed',false);$('pAct').setAttribute('aria-pressed',p==='act');$('pRet').setAttribute('aria-pressed',p==='ret');$('pWk').setAttribute('aria-pressed',p==='week');load()}
+$('specialBtn').onclick=()=>{if(mode!=='special'){prePool=pool;preDiff=diff}mode='special';$('mDaily').setAttribute('aria-pressed',false);$('mPrac').setAttribute('aria-pressed',false);try{history.replaceState(null,'','#special')}catch(e){}load();window.scrollTo({top:0,behavior:'smooth'})};
+function setPool(p){exitSpecial();pool=p;if(mode==='practice'&&!canPractice())mode='daily',$('mDaily').setAttribute('aria-pressed',true),$('mPrac').setAttribute('aria-pressed',false);$('pAct').setAttribute('aria-pressed',p==='act');$('pRet').setAttribute('aria-pressed',p==='ret');$('pWk').setAttribute('aria-pressed',p==='week');load()}
 $('pWk').onclick=()=>setPool('week');
 function paintDiff(){document.querySelectorAll('#diffSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.d===diff))}
-document.querySelectorAll('#diffSeg button').forEach(b=>b.onclick=()=>{diff=b.dataset.d;store.set('mp2-diff',diff);paintDiff();load()});paintDiff();
-function setMode(m){if(m==='practice'&&!gate())return;mode=m;$('mDaily').setAttribute('aria-pressed',m==='daily');$('mPrac').setAttribute('aria-pressed',m==='practice');load()}
+document.querySelectorAll('#diffSeg button').forEach(b=>b.onclick=()=>{exitSpecial();diff=b.dataset.d;store.set('mp2-diff',diff);paintDiff();load()});paintDiff();
+function setMode(m){if(m==='practice'&&!gate())return;exitSpecial();mode=m;$('mDaily').setAttribute('aria-pressed',m==='daily');$('mPrac').setAttribute('aria-pressed',m==='practice');load()}
 $('pAct').onclick=()=>setPool('act');$('pRet').onclick=()=>setPool('ret');$('mDaily').onclick=()=>setMode('daily');$('mPrac').onclick=()=>setMode('practice');
 $('srcnote').innerHTML=`Last week: notable lines from completed ${DATA.W.season||SEASON} Week ${DATA.W.week} games. Career stats are regular-season totals through Week ${DATA.week} of ${SEASON}, from <a href="https://www.pro-football-reference.com/" target="_blank" rel="noopener">Pro Football Reference</a> via nflverse. Active: on a ${SEASON} roster. Retired: last played ${SEASON-2} or earlier, drafted 1980 or later.`;
+if(location.hash==='#special'){prePool=pool;preDiff=diff;mode='special';$('mDaily').setAttribute('aria-pressed',false);$('mPrac').setAttribute('aria-pressed',false)}
 load();
 </script>
