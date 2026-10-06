@@ -13,7 +13,7 @@ Data sources (all public, from nflverse, built on Pro Football Reference):
                     and career top-up for games newer than the PFR snapshot
   games.csv         schedule + scores for the Last Week mode
 """
-import base64, json, os, sys, urllib.request
+import base64, hashlib, json, os, sys, urllib.parse, urllib.request
 from collections import Counter
 import pandas as pd
 
@@ -288,7 +288,41 @@ log(f'   {WS} week {WW}: {len(lines)} notable lines')
 # ---------- 7. write page ----------
 log('6/6 writing index.html')
 keep = set(act_ids) | set(ret_ids)
-A = [{k: p[k] for k in ['id', 'name', 'pos', 'pg', 'active', 'yrs', 'games', 'college', 'draft', 'pb', 'ap', 'hof', 'stats', 'teams', 'logo', 'pfr', 'espn', 'hs']} for p in allp if p['id'] in keep]
+
+# Real photos for players NFL.com only has a blank-helmet placeholder for (most retired guys).
+# Wikidata links each player's Pro Football Reference ID (exact match, no same-name mixups) to his
+# Wikimedia Commons photo. The page uses it only when NFL.com's image turns out to be the placeholder.
+def wikidata_photos(pfr_ids):
+    cache = os.path.join(CACHE, 'wikidata_photos.json')
+    out = {}
+    try:
+        ids = sorted({x[0] + '/' + x for x in pfr_ids if isinstance(x, str) and x})
+        for i in range(0, len(ids), 300):
+            vals = ' '.join('"%s"' % x for x in ids[i:i + 300])
+            q = 'SELECT ?pfr ?img WHERE { VALUES ?pfr { %s } ?p wdt:P3561 ?pfr . ?p wdt:P18 ?img }' % vals
+            req = urllib.request.Request('https://query.wikidata.org/sparql',
+                data=urllib.parse.urlencode({'query': q}).encode(),
+                headers={'Accept': 'application/sparql-results+json',
+                         'User-Agent': 'ClockedBuild/1.0 (https://github.com/leothuejones-lab/Clocked)'})
+            res = json.load(urllib.request.urlopen(req, timeout=60))
+            for row in res['results']['bindings']:
+                k = row['pfr']['value'].split('/', 1)[-1]
+                out.setdefault(k, urllib.parse.unquote(row['img']['value'].rsplit('/', 1)[-1]))
+        json.dump(out, open(cache, 'w'))
+        log(f'   wikidata photos: {len(out)} found')
+    except Exception as e:
+        if os.path.exists(cache): out = json.load(open(cache))
+        log(f'   wikidata photos unavailable ({e}); using {len(out)} cached')
+    return out
+
+WD = wikidata_photos(p['pfr'] for p in allp if p['id'] in keep)
+def commons_path(name):
+    # upload.wikimedia.org stores files under md5-based folders: thumb/1/11/File_name.jpg
+    if not name: return None
+    f = name.replace(' ', '_'); h = hashlib.md5(f.encode()).hexdigest()
+    return f'{h[0]}/{h[:2]}/{f}'
+for p in allp: p['wd'] = commons_path(WD.get(p['pfr']))
+A = [{k: p[k] for k in ['id', 'name', 'pos', 'pg', 'active', 'yrs', 'games', 'college', 'draft', 'pb', 'ap', 'hof', 'stats', 'teams', 'logo', 'pfr', 'espn', 'hs', 'wd']} for p in allp if p['id'] in keep]
 Lst = [[p['id'], p['label'], p['pg'], p['yrs'][0], p['pb'], p['logo'], 1 if p['active'] else 0] for p in allp]
 have = {x[0] for x in Lst}
 for x in lines:
