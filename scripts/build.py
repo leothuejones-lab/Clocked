@@ -266,3 +266,12 @@ tpl = open(os.path.join(ROOT, 'src', 'template.html'), encoding='utf-8').read()
 html = tpl.replace('/*DATA*/null', json.dumps(DATA, separators=(',', ':'))).replace('__SITE_URL__', SITE_URL)
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(html)
 log(f'done: index.html ({len(html) // 1024} KB), stats through {SEASON} week {WEEK}')
+
+# ---------- 8. creator studio (unlinked page: any player, any graphic) ----------
+stpl = os.path.join(ROOT, 'src', 'studio.html')
+if os.path.exists(stpl):
+    SP = [{k: p[k] for k in ['name', 'label', 'pos', 'active', 'yrs', 'games', 'pb', 'ap', 'hof', 'stats', 'logo']} for p in allp]
+    SDATA = {'P': SP, 'logos': logos, 'W': {'week': WW, 'season': WS, 'lines': [{k: x[k] for k in ['name', 'pos', 'team', 'opp', 'home', 'score', 'line', 'score_key']} for x in lines]}}
+    shtml = open(stpl, encoding='utf-8').read().replace('/*DATA*/null', json.dumps(SDATA, separators=(',', ':'))).replace('__SITE_URL__', SITE_URL)
+    open(os.path.join(ROOT, 'studio.html'), 'w', encoding='utf-8').write(shtml)
+    log(f'done: studio.html ({len(shtml) // 1024} KB)')
