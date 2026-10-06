@@ -186,17 +186,47 @@ h1 .s i{display:inline-block;font-style:normal;transform:skewX(calc(var(--skew) 
 .seg button:first-child{margin-left:3px}
 #skip{margin-right:4px}
 .pips{padding-right:1px}
+/* ---- top bar: help + stats icons ---- */
+.icons{display:flex;gap:6px;align-items:center;padding-bottom:4px;flex:none}
+.ico{width:34px;height:34px;border-radius:50%;border:1.5px solid rgba(255,255,255,.35);background:transparent;color:var(--chalk);font:800 18px var(--body);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.ico svg{width:18px;height:18px;fill:currentColor}
+.ico:focus-visible{outline:3px solid var(--chyron);outline-offset:2px}
+/* ---- Today / Practice switch ---- */
+.view{display:grid;grid-template-columns:1.5fr 1fr;gap:8px}
+.view button{border:0;cursor:pointer;text-align:left;background:var(--slab);color:var(--chalk);padding:9px 14px 7px;transform:skewX(var(--skew));box-shadow:0 4px 0 #031009;transition:transform .06s,box-shadow .06s;min-width:0}
+.view button:first-child{margin-left:5px}.view button:last-child{margin-right:5px}
+@media (max-width:370px){h1{font-size:46px}.view b{font-size:22px}}
+.view button>span{display:flex;flex-direction:column;transform:skewX(calc(var(--skew) * -1));min-width:0}
+.view b{font-family:var(--display);font-weight:600;font-size:26px;line-height:1;padding-top:3px;white-space:nowrap;text-transform:uppercase;letter-spacing:.02em}
+.view em{font-style:normal;font:800 11px var(--body);letter-spacing:.07em;text-transform:uppercase;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.view button[aria-pressed="true"]{background:var(--chyron);color:var(--ink);box-shadow:0 4px 0 var(--chyron-dk)}
+.view button:active{transform:skewX(var(--skew)) translateY(3px);box-shadow:0 1px 0 #031009}
+.view button:focus-visible{outline:3px solid var(--paper);outline-offset:2px}
+.prac{display:flex;flex-direction:column;gap:10px}
+/* ---- stats + help sheets ---- */
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.sgrid b{display:block;font-family:var(--display);font-weight:600;font-size:40px;line-height:1;padding-top:4px}
+.sgrid span{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.dist{display:flex;flex-direction:column;gap:4px}
+.dist .row{display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:center;font-weight:800;font-size:13px}
+.dist .bar{background:#3A4A40;color:#fff;text-align:right;padding:3px 8px;min-width:26px;font-variant-numeric:tabular-nums}
+.dist .bar.now{background:var(--hit)}
+.k2{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.howto{display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.4}
+.howto p{margin:0}
+.howto .ex{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="top"><h1>Clock<span class="s"><i>ed</i></span></h1></div>
+    <div class="top"><h1>Clock<span class="s"><i>ed</i></span></h1><div class="icons"><button class="ico" id="helpBtn" type="button" aria-label="How to play">?</button><button class="ico" id="statsBtn" type="button" aria-label="Your stats"><svg viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="9" width="4" height="8"/><rect x="7" y="4" width="4" height="13"/><rect x="13" y="1" width="4" height="16"/></svg></button></div></div>
+    <div class="view" role="group" aria-label="Game"><button id="vDaily" type="button" aria-pressed="true"><span><b id="dNum">Clocked</b><em id="dTheme">Today's player</em></span></button><button id="vPrac" type="button" aria-pressed="false"><span><b>Practice</b><em>Extra players</em></span></button></div>
+    <div class="prac" id="pracBar" hidden>
     <div class="tabs" role="group" aria-label="Player pool"><button id="pAct" aria-pressed="true">Active</button><button id="pRet" aria-pressed="false">Retired</button><button id="pWk" aria-pressed="false">Last week</button></div>
-    <button class="special" id="specialBtn" type="button"><span><b id="spNum">Daily Special</b><em id="spTheme"></em><i id="spGo">&rarr;</i></span></button>
     <div class="subs">
       <div class="seg" role="group" aria-label="Difficulty" id="diffSeg"><button data-d="easy"><span>Easy</span></button><button data-d="medium"><span>Medium</span></button><button data-d="hard"><span>Hard</span></button><button data-d="die"><span>Diehard</span></button></div>
-      <div class="seg" role="group" aria-label="Mode"><button id="mPrac" aria-pressed="true"><span>Random</span></button><button id="mDaily" aria-pressed="false"><span>Daily</span></button></div>
+    </div>
     </div>
   </header>
   <div class="meta"><span id="title">Daily #1</span><span class="pips" id="pips"></span></div>
@@ -226,7 +256,6 @@ h1 .s i{display:inline-block;font-style:normal;transform:skewX(calc(var(--skew) 
   <div class="clues" id="clues"></div>
 
   <div class="foot">
-    <div><b>Easy</b>: biggest stars (4+ Pro Bowls active, Hall of Fame or 7+ retired), two clues up front, multiple choice after one miss. <b>Medium</b>: stars, multiple choice after three misses. <b>Hard</b>: the full Pro Bowl pool, type it yourself. <b>Diehard</b>: anyone with a Pro Bowl, and the team logo stays hidden. Every card starts with position and a stat clue; each wrong guess unlocks another clue and sharpens the photo. Chips: <b>POS</b> same position group, <b>team</b> logo match, debut year and Pro Bowl arrows point toward the answer.</div>
     <div id="srcnote"></div>
   </div>
 </div>
@@ -295,8 +324,10 @@ DIFF.chal={label:'Challenge',act:p=>true,ret:p=>true,wk:999,start:1,mc:99,logo:f
 const chEnc=id=>btoa(id.split('').reverse().join('')).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const chDec=c=>{try{return atob(c.replace(/-/g,'+').replace(/_/g,'/')).split('').reverse().join('')}catch(e){return null}};
 let CHID=null;{const m=location.hash.match(/^#c=([\w-]+)/);if(m){const id=chDec(m[1]);if(id&&A[id])CHID=id}}
-function paintSpecial(){const sp=specialInfo();$('spNum').textContent='Daily Special #'+sp.num;$('spTheme').textContent=sp.theme+' · Hard';$('spGo').innerHTML=mode==='special'&&!CHID?'&#10003;':'&rarr;';$('specialBtn').classList.toggle('on',mode==='special'&&!CHID)}
-function exitSpecial(){if(mode!=='special')return;CHID=null;mode='practice';diff=preDiff;pool=prePool;$('mPrac').setAttribute('aria-pressed',true);$('mDaily').setAttribute('aria-pressed',false);try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
+function paintSpecial(){const sp=specialInfo();$('dNum').textContent='Clocked #'+sp.num;$('dTheme').textContent=sp.theme;$('vDaily').setAttribute('aria-pressed',mode==='special'&&!CHID);$('vPrac').setAttribute('aria-pressed',mode==='practice');$('pracBar').hidden=mode!=='practice'}
+function exitSpecial(){if(mode!=='special')return;CHID=null;mode='practice';diff=preDiff;pool=prePool;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
+function goDaily(){if(mode!=='special'){prePool=pool;preDiff=diff}CHID=null;mode='special';try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}load();window.scrollTo({top:0,behavior:'smooth'})}
+function goPractice(){if(mode==='practice')return;exitSpecial();mode='practice';load()}
 let CLUES=CAREER;
 const SIL=`<svg viewBox="0 0 200 200" aria-hidden="true"><ellipse cx="100" cy="72" rx="34" ry="41"/><path d="M100 120c-14 0-26-4-33-10l-6 10c-28 6-48 20-55 40l-4 40h196l-4-40c-7-20-27-34-55-40l-6-10c-7 6-19 10-33 10z"/></svg>`;
 const PN={act:'Active',ret:'Retired',week:'Last week'};
@@ -344,7 +375,7 @@ function load(){
     /* rendezvous pick: stays the same player all day even if the weekly update reshuffles the pool */
     let best=null,bh=-1;for(const id of ids){const k=pool==='week'?WK[id].id+'|'+WK[id].line.join(','):id;const h=fnv(k+'#'+sp.day);if(h>bh){bh=h;best=id}}ans=(pool==='week'?WK:A)[best];
     const s=store.get('clk-special');state=(s&&s.day===sp.day)?s:{day:sp.day,guesses:[],done:false,won:false};
-    $('title').textContent=`Daily Special #${sp.num} · ${sp.theme}`;
+    $('title').textContent=`Guess today's player`;
   }else if(mode==='daily'){
     const ord=poolOrder();ans=get(ord[d%ord.length]);
     const s=store.get(SK());state=(s&&s.day===d)?s:{day:d,guesses:[],done:false,won:false};
@@ -360,11 +391,11 @@ function load(){
     const pick=bag.pop();store.set(bk,bag);ans=get(pick);state={guesses:[],done:false,won:false};
     store.set(CK(),{day:d,pick,state});
     }
-    $('title').textContent=`${PN[pool]} · ${DIFF[diff].label} · Random`;
+    $('title').textContent=`Practice · ${PN[pool]} · ${DIFF[diff].label}`;
   }
   const lg=LOGOS[ans.logo];
   paintTeam();
-  $('logo').src=lg.img;$('logo').parentElement.classList.toggle('hid',!showLogo());$('pos').textContent=ans.pos;$('tag').textContent=mode==='special'?(CHID?'Challenge':'Daily Special'):pool==='week'?'Week '+DATA.W.week:PN[pool];
+  $('logo').src=lg.img;$('logo').parentElement.classList.toggle('hid',!showLogo());$('pos').textContent=ans.pos;$('tag').textContent=mode==='special'?(CHID?'Challenge':'Clocked #'+specialInfo().num):pool==='week'?'Week '+DATA.W.week:PN[pool];
   ['pAct','pRet','pWk'].forEach(i=>$(i).setAttribute('aria-pressed',mode!=='special'&&({pAct:'act',pRet:'ret',pWk:'week'})[i]===pool));
   setPhoto(ans);render(-1);paintLimits();paintSpecial();paintDiff();
 }
@@ -405,11 +436,11 @@ function render(fresh){
     const tms=pool==='week'?OPP[ans.team]:[...new Set(ans.teams.map(t=>t[0]))].join(', ');
     res.innerHTML=`<div class="rhead"><span class="rtag">${state.won?'Clocked':'Juked'}</span><span class="rscore">${state.won?n:'X'}/${MAX}</span></div>
       <div class="rname">${ans.name}</div>
-      <div class="sm">${POSNAME[ans.pos]||ans.pos} · ${tms}${mode!=='practice'&&!CHID?' · '+streak():''}</div>${mode==='special'&&!CHID?`<div class="sm">Next Daily Special in ${nextIn()}</div>`:''}
+      <div class="sm">${POSNAME[ans.pos]||ans.pos} · ${tms}${mode!=='practice'&&!CHID?' · '+streak():''}</div>${mode==='special'&&!CHID?`<div class="sm">Next Clocked in ${nextIn()}</div>`:''}
       <div class="actions"><button class="btn ghost" id="share"><span>Copy text</span></button>
         <a class="btn x" id="postX" href="${tweetURL()}" target="_blank" rel="noopener"><span>Post to X</span></a>
         <button class="btn ghost" id="graphic"><span>Get graphic</span></button>
-        ${mode!=='practice'?'<button class="btn ghost" id="toPrac"><span>Play random</span></button>':'<button class="btn" id="next"><span>Next player</span></button>'}</div>
+        ${mode!=='practice'?'<button class="btn ghost" id="toPrac"><span>Practice</span></button>':'<button class="btn" id="next"><span>Next player</span></button>'}</div>
       ${ans.pfr?`<a href="https://www.pro-football-reference.com/players/${ans.pfr[0]}/${ans.pfr}.htm" target="_blank" rel="noopener" class="sm" style="font-weight:800;color:var(--turf)">Full career on Pro Football Reference</a>`:''}`;
     $('graphic').onclick=()=>showGraphic('result');$('postX').onclick=()=>copyGraphic('result',true);
     $('share')&&($('share').onclick=share);$('toPrac')&&($('toPrac').onclick=()=>setMode('practice'));$('next')&&($('next').onclick=()=>{store.set(CK(),null);load()});
@@ -427,7 +458,9 @@ function mcOptions(){
 function streak(){if(CHID)return '';const s=store.get(mode==='special'?'clk-special-stats':'mp2-stats-'+pool+'-'+diff);return s?`Streak ${s.streak} · Played ${s.played}`:''}
 function finish(won){state.done=true;state.won=won;
   if(mode!=='practice'&&!CHID){const k=mode==='special'?'clk-special-stats':'mp2-stats-'+pool+'-'+diff,s=store.get(k)||{played:0,wins:0,streak:0};
-    if(s.lastDay!==state.day){s.played++;if(won){s.wins++;s.streak=s.lastWin===state.day-1?s.streak+1:1;s.lastWin=state.day}else s.streak=0;s.lastDay=state.day;store.set(k,s)}}}
+    if(s.lastDay!==state.day){s.played++;if(won){s.wins++;s.streak=s.lastWin===state.day-1?s.streak+1:1;s.lastWin=state.day}else s.streak=0;s.lastDay=state.day;
+      s.max=Math.max(s.max||0,s.streak);s.dist=s.dist||[0,0,0,0,0,0,0];s.dist[won?state.guesses.length-1:6]++;store.set(k,s)}
+    if(mode==='special')setTimeout(()=>{if($('sheet').hidden)showStats()},1700)}}
 function submit(id){
   if(state.done||!id)return;
   if(id!=='skip'&&state.guesses.includes(id)){toast('Already guessed');return}
@@ -440,16 +473,17 @@ function submit(id){
 }
 let showName=store.get('clk-showname2')===true;
 const SHARE_URL='__SITE_URL__';
+function gradeOf(g){if(g===ans.id)return 'hit';if(g==='skip')return 'skip';const r=LBY[g];return r&&(r[2]===ans.pg||r[5]===ans.logo)?'close':'miss'}
 function shareText(){
-  const cells=state.guesses.map(g=>g===ans.id?'🟩':g==='skip'?'⬜':'🟥').join('');
+  const cells=state.guesses.map(g=>({hit:'🟩',close:'🟨',miss:'🟥',skip:'⬜'})[gradeOf(g)]).join('');
   if(CHID)return `Clocked Challenge ⏱️ Diehard\n${state.won?state.guesses.length:'X'}/${MAX} ${cells}`;
-  if(mode==='special'){const sp=specialInfo();return `Clocked Daily Special #${sp.num} ⏱️ ${sp.theme}\n${state.won?state.guesses.length:'X'}/${MAX} ${cells}`}
-  const tag=mode==='daily'?`Daily #${state.day+1}`:'';
+  if(mode==='special'){const sp=specialInfo();return `Clocked #${sp.num} ⏱️ ${state.won?state.guesses.length:'X'}/${MAX}\n${cells}`}
+  const tag='Practice';
   const who=showName&&state.done?(state.won?`I clocked ${ans.name} in ${state.guesses.length}/${MAX}`:`${ans.name} juked me`):`${state.won?state.guesses.length:'X'}/${MAX}`;
   return `Clocked ⏱️ ${PN[pool]} · ${DIFF[diff].label} ${tag}\n${who} ${cells}`}
-function linkURL(){return SHARE_URL?SHARE_URL+(mode==='special'?(CHID?'/#c='+chEnc(CHID):'/#special'):''):''}
+function linkURL(){return SHARE_URL?SHARE_URL+(mode==='special'?(CHID?'/#c='+chEnc(CHID):''):''):''}
 function tweetURL(){return 'https://twitter.com/intent/tweet?text='+encodeURIComponent(shareText()+(linkURL()?'\n\n'+linkURL():''))}
-function specialTweetURL(){const sp=specialInfo();return 'https://twitter.com/intent/tweet?text='+encodeURIComponent((CHID?`Clocked Challenge ⏱️ Diehard rules, no logo\nCan you clock him? 👇`:`Today's Clocked Daily Special #${sp.num} ⏱️ ${sp.theme}\nCan you clock him? 👇`)+(linkURL()?'\n\n'+linkURL():''))}
+function specialTweetURL(){const sp=specialInfo();return 'https://twitter.com/intent/tweet?text='+encodeURIComponent((CHID?`Clocked Challenge ⏱️ Diehard rules, no logo\nCan you clock him? 👇`:`Clocked #${sp.num} ⏱️ ${sp.theme}\nCan you clock today's player? 👇`)+(linkURL()?'\n\n'+linkURL():''))}
 function copyText(t,msg){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>toast(msg),()=>toast(t));else toast(t)}
 function share(){copyText(shareText()+(linkURL()?'\n'+linkURL():''),'Result copied')}
 let tt;function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400)}
@@ -490,21 +524,46 @@ function CK(){return 'clk-cur-'+pool+'-'+diff}
 function cnt(pl){const d=dayIdx(),c=store.get('clk-cnt-'+(pl||pool));return c&&c.day===d?c:{day:d,seen:[]}}
 function count(tag){const c=cnt();if(!c.seen.includes(tag)){c.seen.push(tag);store.set('clk-cnt-'+pool,c)}}
 function left(pl){return Math.max(0,LIMIT-cnt(pl).seen.length)}
-function paintLimits(){if(mode==='special'){$('left').textContent=CHID?'Challenge · free, doesn\'t use your 6':(showLogo()?'Daily Special · free, doesn\'t use your 6':'Team logo unlocks after 3 misses');return}const n=left();$('left').textContent=`${n} of ${LIMIT} ${PN[pool]} players left today`+(mode==='daily'?' · daily':'')}
+function paintLimits(){if(mode==='special'){$('left').textContent=CHID?'Challenge · free, doesn\'t use your 6':(showLogo()?'Same player for everyone today':'Team logo unlocks after 3 misses');return}const n=left();$('left').textContent=`${n} of ${LIMIT} ${PN[pool]} players left today`+(mode==='daily'?' · daily':'')}
 function showLimit(){
   ['card','clues','guesses','play','mc'].forEach(id=>$(id).hidden=true);
-  $('title').textContent=`${PN[pool]} · ${DIFF[diff].label} · Random`;
+  $('title').textContent=`Practice · ${PN[pool]} · ${DIFF[diff].label}`;
   $('pips').innerHTML='';
   const others=['act','ret','week'].filter(p=>p!==pool&&left(p)>0);
   const res=$('result');res.hidden=false;res.classList.remove('lost');
   res.innerHTML=`<div class="rhead"><span class="rtag">That's ${LIMIT}</span></div>
     <div class="rname">You've played ${LIMIT} ${PN[pool]} players today.</div>
     <div class="sm">New players at midnight.${others.length?' Still open:':''}</div>
-    <div class="actions">${others.map(p=>`<button class="btn" data-pool="${p}"><span>${PN[p]} (${left(p)} left)</span></button>`).join('')}<button class="btn ghost" id="toDaily"><span>Today's daily</span></button></div>`;
+    <div class="actions">${others.map(p=>`<button class="btn" data-pool="${p}"><span>${PN[p]} (${left(p)} left)</span></button>`).join('')}<button class="btn ghost" id="toDaily"><span>Today's Clocked</span></button></div>`;
   res.querySelectorAll('[data-pool]').forEach(b=>b.onclick=()=>setPool(b.dataset.pool));
-  $('toDaily').onclick=()=>setMode('daily');
-  paintLimits();
+  $('toDaily').onclick=goDaily;
+  paintLimits();paintSpecial();
 }
+function dailyStats(){const s=store.get('clk-special-stats')||{played:0,wins:0,streak:0},today=specialInfo().day;
+  return {played:s.played,win:s.played?Math.round(100*s.wins/s.played):0,streak:(s.lastWin===today||s.lastWin===today-1)?s.streak:0,max:Math.max(s.max||0,s.streak||0),dist:s.dist||[0,0,0,0,0,0,0]}}
+function showStats(){const t=dailyStats(),sp=specialInfo(),st=store.get('clk-special'),done=st&&st.day===sp.day&&st.done,big=Math.max(1,...t.dist),
+  mine=done?(st.won?st.guesses.length-1:6):-1;
+  openSheet(`<h3>Your Clocked stats</h3>
+   <div class="sgrid"><div><b>${t.played}</b><span>Played</span></div><div><b>${t.win}</b><span>Win %</span></div><div><b>${t.streak}</b><span>Streak</span></div><div><b>${t.max}</b><span>Best</span></div></div>
+   <div class="k2">Guesses it took</div>
+   <div class="dist">${t.dist.map((n,i)=>`<div class="row"><span>${i<6?i+1:'X'}</span><div class="bar${i===mine?' now':''}" style="width:${Math.max(8,Math.round(100*n/big))}%">${n}</div></div>`).join('')}</div>
+   <div class="sm">${done?`Next Clocked in ${nextIn()}.`:t.played?`Today's Clocked #${sp.num} is waiting.`:`Play today's Clocked #${sp.num} to start your streak.`} Stats are saved on this device.</div>
+   <div class="actions">${done?'<button class="btn" id="stShare"><span>Copy result</span></button>':'<button class="btn" id="stPlay"><span>Play today</span></button>'}<button class="btn ghost" data-close><span>Close</span></button></div>`);
+  if($('stShare'))$('stShare').onclick=()=>{const m=mode,c=CHID;if(m!=='special'||c){toast('Open today\'s Clocked to share');return}share()};
+  if($('stPlay'))$('stPlay').onclick=()=>{closeSheet();goDaily()}}
+function showHelp(){openSheet(`<h3>How to play</h3>
+  <div class="howto">
+   <p><b>Guess the NFL player in 6 tries.</b> Every card starts with his position and career stats. Real numbers, updated every week.</p>
+   <p>Each wrong guess unlocks another clue (college, honors, draft, teams) and sharpens the photo.</p>
+   <p>Your guesses show how close you were:</p>
+   <div class="ex"><span class="chip y">WR</span> same position group</div>
+   <div class="ex"><span class="chip y">TEAM ✓</span> played for his team</div>
+   <div class="ex"><span class="chip m">2015 ↑</span> debut year (arrow points toward his)</div>
+   <p>Your share grid: 🟩 got him, 🟨 right team or position, 🟥 miss, ⬜ skip.</p>
+   <p><b>Clocked #</b>: one player a day, the same for everyone. The team logo stays hidden until your 3rd miss. New one at midnight ET.</p>
+   <p><b>Practice</b>: extra players from Active, Retired or Last week, 6 per pool a day. Easy = biggest stars with multiple choice; Medium = stars; Hard = every Pro Bowler, no help; Diehard = logo hidden the whole way.</p>
+  </div>
+  <div class="actions"><button class="btn" data-close><span>Play</span></button></div>`)}
 function openSheet(html){$('panel').innerHTML=html;$('sheet').hidden=false;const c=$('panel').querySelector('[data-close]');c&&c.focus()}
 function closeSheet(){$('sheet').hidden=true}
 $('sheet').addEventListener('click',e=>{if(e.target.id==='sheet'||e.target.closest('[data-close]'))closeSheet()});
@@ -521,7 +580,7 @@ async function drawGraphic(kind){
   c.textBaseline='alphabetic';c.font='700 96px Teko, Arial Narrow, sans-serif';c.fillStyle='#F2F5EF';c.fillText('CLOCK',60,128);
   const cw=c.measureText('CLOCK').width;slab(c,60+cw+6,52,112,86,'#FFD23F');c.fillStyle='#101C15';c.fillText('ED',60+cw+22,128);
   c.font='800 22px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.75)';c.textAlign='right';
-  c.fillText((mode==='special'?(CHID?'Clocked Challenge · Diehard':'Daily Special #'+specialInfo().num+' · '+specialInfo().theme):PN[pool]+' · '+DIFF[diff].label+(mode==='daily'?' · Daily #'+((state.day||0)+1):' · Random')).toUpperCase(),W-60,110);c.textAlign='left';
+  c.fillText((mode==='special'?(CHID?'Clocked Challenge · Diehard':'Clocked #'+specialInfo().num+' · '+specialInfo().theme):PN[pool]+' · '+DIFF[diff].label+(mode==='daily'?' · Daily #'+((state.day||0)+1):' · Random')).toUpperCase(),W-60,110);c.textAlign='left';
   // card
   const lg=LOGOS[ans.logo],tc=teamCol(),X=60,Y=170,CW=620,CH=440;
   c.save();rr(c,X,Y,CW,CH,26);c.clip();c.fillStyle=tc.c1;c.fillRect(X,Y,CW,CH);
@@ -546,7 +605,7 @@ async function drawGraphic(kind){
     c.font='700 210px Teko, Arial Narrow, sans-serif';c.fillText(`${state.won?state.guesses.length:'X'}/${MAX}`,RX,440);
     const label=state.won?'CLOCKED':'JUKED';c.font='600 56px Teko, Arial Narrow, sans-serif';const lw=c.measureText(label).width+40;
     slab(c,RX,190,lw,64,state.won?'#FFD23F':'#E0402A');c.fillStyle=state.won?'#101C15':'#fff';c.fillText(label,RX+24,242);
-    for(let i=0;i<MAX;i++){const g=state.guesses[i];slab(c,RX+i*66,478,56,26,g===undefined?'rgba(255,255,255,.16)':g===ans.id?'#FFD23F':g==='skip'?'rgba(255,255,255,.45)':'#E0402A')}
+    for(let i=0;i<MAX;i++){const g=state.guesses[i];slab(c,RX+i*66,478,56,26,g===undefined?'rgba(255,255,255,.16)':({hit:'#22A35A',close:'#FFD23F',skip:'rgba(255,255,255,.45)',miss:'#E0402A'})[gradeOf(g)])}
     c.font='600 26px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.8)';c.fillText('Can you beat it?',RX,570);
   }else{
     c.font='700 92px Teko, Arial Narrow, sans-serif';c.fillText('WHO IS',RX,268);c.fillText('THIS?',RX,350);
@@ -576,17 +635,19 @@ function copyGraphic(kind,posting){
   }catch(e){fail()}
 }
 $('challenge').onclick=()=>showGraphic('challenge');
-$('specialBtn').onclick=()=>{if(mode!=='special'){prePool=pool;preDiff=diff}CHID=null;mode='special';$('mDaily').setAttribute('aria-pressed',false);$('mPrac').setAttribute('aria-pressed',false);try{history.replaceState(null,'','#special')}catch(e){}load();window.scrollTo({top:0,behavior:'smooth'})};
-function setPool(p){exitSpecial();pool=p;if(mode==='practice'&&!canPractice())mode='daily',$('mDaily').setAttribute('aria-pressed',true),$('mPrac').setAttribute('aria-pressed',false);$('pAct').setAttribute('aria-pressed',p==='act');$('pRet').setAttribute('aria-pressed',p==='ret');$('pWk').setAttribute('aria-pressed',p==='week');load()}
+$('vDaily').onclick=goDaily;$('vPrac').onclick=goPractice;$('helpBtn').onclick=showHelp;$('statsBtn').onclick=showStats;
+function setPool(p){exitSpecial();pool=p;$('pAct').setAttribute('aria-pressed',p==='act');$('pRet').setAttribute('aria-pressed',p==='ret');$('pWk').setAttribute('aria-pressed',p==='week');load()}
 $('pWk').onclick=()=>setPool('week');
 function paintDiff(){document.querySelectorAll('#diffSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.d===diff))}
 document.querySelectorAll('#diffSeg button').forEach(b=>b.onclick=()=>{exitSpecial();diff=b.dataset.d;store.set('mp2-diff',diff);paintDiff();load()});paintDiff();
-function setMode(m){if(m==='practice'&&!gate())return;exitSpecial();mode=m;$('mDaily').setAttribute('aria-pressed',m==='daily');$('mPrac').setAttribute('aria-pressed',m==='practice');load()}
-$('pAct').onclick=()=>setPool('act');$('pRet').onclick=()=>setPool('ret');$('mDaily').onclick=()=>setMode('daily');$('mPrac').onclick=()=>setMode('practice');
+function setMode(m){if(m==='special'){goDaily();return}exitSpecial();mode='practice';load()}
+$('pAct').onclick=()=>setPool('act');$('pRet').onclick=()=>setPool('ret');
 $('srcnote').innerHTML=`Last week: notable lines from completed ${DATA.W.season||SEASON} Week ${DATA.W.week} games. Career stats are regular-season totals through Week ${DATA.week} of ${SEASON}, from <a href="https://www.pro-football-reference.com/" target="_blank" rel="noopener">Pro Football Reference</a> via nflverse. Active: on a ${SEASON} roster. Retired: last played ${SEASON-2} or earlier, drafted 1980 or later.`;
 window.addEventListener('hashchange',()=>location.reload());
-if(location.hash==='#special'||CHID){prePool=pool;preDiff=diff;mode='special';$('mDaily').setAttribute('aria-pressed',false);$('mPrac').setAttribute('aria-pressed',false)}
+/* the front page IS today's Clocked; practice is one tap away */
+prePool=pool;preDiff=diff;mode='special';
 load();
+if(!store.get('clk-help-seen')&&!CHID){store.set('clk-help-seen',1);showHelp()}
 </script>
 </body>
 </html>
