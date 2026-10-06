@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Clocked</title>
 <meta name="description" content="Guess the NFL player from a blacked-out card. Real stats, updated every week.">
 <meta property="og:type" content="website">
@@ -175,6 +176,11 @@ h1 .s i{display:inline-block;font-style:normal;transform:skewX(calc(var(--skew) 
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--chyron);color:var(--ink);padding:9px 16px;font-weight:800;box-shadow:0 4px 0 var(--chyron-dk);max-width:calc(100vw - 32px);white-space:pre-line;overflow-wrap:anywhere}
 @media (max-width:440px){.clue{grid-template-columns:1fr;gap:3px}.g .chip.pb{display:none}h1{font-size:50px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* keep slanted pieces inside the side margins */
+.special{width:calc(100% - 8px);margin:0 4px}
+.seg button:first-child{margin-left:3px}
+#skip{margin-right:4px}
+.pips{padding-right:1px}
 </style>
 
 <div class="wrap">
@@ -269,14 +275,21 @@ function poolIds(){return pool==='week'?WKSORT.slice(0,DIFF[diff].wk):POOLS[pool
 function poolOrder(){return shuffled(poolIds(),SEEDS[pool]*100+DSEED[diff])}
 const SK=()=>'mp2-'+pool+'-'+diff;
 /* ---- Daily Special: one shared puzzle per day (Eastern time), themed by weekday, free to play ---- */
-DIFF.special={label:'Special',act:p=>p.pb>=3,ret:p=>p.hof||p.pb>=5,wk:50,start:1,mc:3,logo:true};
-const SP_THEMES=[['act','Sunday Star',1],['act','Monday Mystery',1],['act','Tuesday Mystery',1],['week','Last Week Line',1],['ret','Throwback Thursday',1],['act','College Friday',2],['act','Saturday Showdown',1]];
+/* the daily is HARD: full Pro Bowl pool, no multiple choice, team logo + colors hidden until 3 misses */
+DIFF.special={label:'Hard',act:p=>p.pb>=2||p.ap>=1,ret:p=>p.hof||p.pb>=3,wk:50,start:1,mc:99,logo:false,logoAt:3};
+const SP_THEMES=[['act','Sunday Star',1],['act','Monday Mystery',1],['act','Tuesday Mystery',1],['week','Last Week Line',1],['ret','Throwback Thursday',1],['act','Final Boss Friday',1],['act','Saturday Showdown',1]];
 function fnv(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function nextIn(){try{const q=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(new Date()),g=t=>+q.find(x=>x.type===t).value,m=1440-(g('hour')*60+g('minute'));return Math.floor(m/60)+'h '+(m%60)+'m'}catch(e){return 'a few hours'}}
 function etDate(){try{return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York'}).format(new Date())}catch(e){return new Date().toISOString().slice(0,10)}}
 function specialInfo(){const s=etDate(),dt=new Date(s+'T12:00:00Z'),day=Math.max(0,Math.round((dt-Date.UTC(2026,9,5,12))/864e5)),t=SP_THEMES[dt.getUTCDay()];return{day,num:day+1,pool:t[0],theme:t[1],start:t[2]}}
 let prePool='act',preDiff='medium';
-function paintSpecial(){const sp=specialInfo();$('spNum').textContent='Daily Special #'+sp.num;$('spTheme').textContent=sp.theme;$('spGo').innerHTML=mode==='special'?'&#10003;':'&rarr;';$('specialBtn').classList.toggle('on',mode==='special')}
-function exitSpecial(){if(mode!=='special')return;mode='practice';diff=preDiff;pool=prePool;$('mPrac').setAttribute('aria-pressed',true);$('mDaily').setAttribute('aria-pressed',false);try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
+/* ---- Challenge links: #c=<code> opens one specific player on Diehard rules (logo hidden), free to play ---- */
+DIFF.chal={label:'Challenge',act:p=>true,ret:p=>true,wk:999,start:1,mc:99,logo:false};
+const chEnc=id=>btoa(id.split('').reverse().join('')).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const chDec=c=>{try{return atob(c.replace(/-/g,'+').replace(/_/g,'/')).split('').reverse().join('')}catch(e){return null}};
+let CHID=null;{const m=location.hash.match(/^#c=([\w-]+)/);if(m){const id=chDec(m[1]);if(id&&A[id])CHID=id}}
+function paintSpecial(){const sp=specialInfo();$('spNum').textContent='Daily Special #'+sp.num;$('spTheme').textContent=sp.theme+' · Hard';$('spGo').innerHTML=mode==='special'&&!CHID?'&#10003;':'&rarr;';$('specialBtn').classList.toggle('on',mode==='special'&&!CHID)}
+function exitSpecial(){if(mode!=='special')return;CHID=null;mode='practice';diff=preDiff;pool=prePool;$('mPrac').setAttribute('aria-pressed',true);$('mDaily').setAttribute('aria-pressed',false);try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
 let CLUES=CAREER;
 const SIL=`<svg viewBox="0 0 200 200" aria-hidden="true"><ellipse cx="100" cy="72" rx="34" ry="41"/><path d="M100 120c-14 0-26-4-33-10l-6 10c-28 6-48 20-55 40l-4 40h196l-4-40c-7-20-27-34-55-40l-6-10c-7 6-19 10-33 10z"/></svg>`;
 const PN={act:'Active',ret:'Retired',week:'Last week'};
@@ -297,7 +310,11 @@ function load(){
   CLUES=pool==='week'?WEEKC:CAREER;
   const get=k=>pool==='week'?WK[k]:A[k];
   ['card','clues','guesses'].forEach(id=>$(id).hidden=false);
-  if(mode==='special'){
+  if(mode==='special'&&CHID){
+    ans=A[CHID];pool=ans.active?'act':'ret';diff='chal';CLUES=CAREER;
+    const s=store.get('clk-ch-'+CHID);state=s&&s.guesses?s:{guesses:[],done:false,won:false};
+    $('title').textContent='Clocked Challenge · Diehard rules';
+  }else if(mode==='special'){
     const sp=specialInfo();pool=sp.pool;diff='special';DIFF.special.start=sp.start;
     CLUES=pool==='week'?WEEKC:CAREER;
     const ids=pool==='week'?WKSORT.slice(0,DIFF.special.wk):POOLS[pool].filter(id=>DIFF.special[pool](A[id]));
@@ -323,18 +340,25 @@ function load(){
     $('title').textContent=`${PN[pool]} · ${DIFF[diff].label} · Random`;
   }
   const lg=LOGOS[ans.logo];
-  $('card').style.setProperty('--team',lg.c1);$('card').style.setProperty('--team2',lg.c2);
-  $('logo').src=lg.img;$('logo').parentElement.classList.toggle('hid',!DIFF[diff].logo);$('pos').textContent=ans.pos;$('tag').textContent=mode==='special'?'Daily Special':pool==='week'?'Week '+DATA.W.week:PN[pool];
+  paintTeam();
+  $('logo').src=lg.img;$('logo').parentElement.classList.toggle('hid',!showLogo());$('pos').textContent=ans.pos;$('tag').textContent=mode==='special'?(CHID?'Challenge':'Daily Special'):pool==='week'?'Week '+DATA.W.week:PN[pool];
   ['pAct','pRet','pWk'].forEach(i=>$(i).setAttribute('aria-pressed',mode!=='special'&&({pAct:'act',pRet:'ret',pWk:'week'})[i]===pool));
   setPhoto(ans);render(-1);paintLimits();paintSpecial();paintDiff();
 }
-function save(){if(mode==='special')store.set('clk-special',state);else if(mode==='daily')store.set(SK(),state);else{const c=store.get(CK());if(c){c.state=state;store.set(CK(),c)}}}
+function save(){if(mode==='special')store.set(CHID?'clk-ch-'+CHID:'clk-special',state);else if(mode==='daily')store.set(SK(),state);else{const c=store.get(CK());if(c){c.state=state;store.set(CK(),c)}}}
 function wrongs(){return state.guesses.filter(g=>g!==ans.id).length}
 let popAt=-1;
 function replay(el,c){el.classList.remove(c);void el.offsetWidth;el.classList.add(c)}
+/* hidden-logo modes also hide team colors until the end, otherwise the card color gives the team away */
+const NEUTRAL={c1:'#2E3B34',c2:'#111'};
+function showLogo(){const D=DIFF[diff];return D.logo||state.done||(D.logoAt!=null&&wrongs()>=D.logoAt)}
+function teamCol(){return showLogo()?LOGOS[ans.logo]:NEUTRAL}
+function paintTeam(){const t=teamCol();$('card').style.setProperty('--team',t.c1);$('card').style.setProperty('--team2',t.c2)}
 function render(fresh){
   const w=wrongs(),st0=DIFF[diff].start,shown=state.done?CLUES.length:Math.min(CLUES.length,st0+w);
-  if(state.done)$('logo').parentElement.classList.remove('hid');
+  $('logo').parentElement.classList.toggle('hid',!showLogo());
+  paintTeam();
+  if(mode==='special')paintLimits();
   const card=$('card');card.className='pcard '+(state.done?'s3':w>=5?'s2':w>=3?'s1':'s0');
   const q=$('bust').querySelector('.q');if(q&&state.done)q.remove();
   $('nameplate').hidden=!state.done;$('nameplate').textContent=ans.name;
@@ -358,7 +382,7 @@ function render(fresh){
     const tms=pool==='week'?OPP[ans.team]:[...new Set(ans.teams.map(t=>t[0]))].join(', ');
     res.innerHTML=`<div class="rhead"><span class="rtag">${state.won?'Clocked':'Juked'}</span><span class="rscore">${state.won?n:'X'}/${MAX}</span></div>
       <div class="rname">${ans.name}</div>
-      <div class="sm">${POSNAME[ans.pos]||ans.pos} · ${tms}${mode!=='practice'?' · '+streak():''}</div>
+      <div class="sm">${POSNAME[ans.pos]||ans.pos} · ${tms}${mode!=='practice'&&!CHID?' · '+streak():''}</div>${mode==='special'&&!CHID?`<div class="sm">Next Daily Special in ${nextIn()}</div>`:''}
       <div class="actions"><button class="btn ghost" id="share"><span>Copy text</span></button>
         <a class="btn x" id="postX" href="${tweetURL()}" target="_blank" rel="noopener"><span>Post to X</span></a>
         <button class="btn ghost" id="graphic"><span>Get graphic</span></button>
@@ -377,9 +401,9 @@ function mcOptions(){
   cands=[...new Set(cands)].filter(id=>id!==ans.id&&!state.guesses.includes(id)&&LBY[id]);
   const pick=[];while(pick.length<3&&cands.length){pick.push(cands.splice(Math.floor(r()*cands.length),1)[0])}
   const all=pick.concat([ans.id]);for(let i=all.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[all[i],all[j]]=[all[j],all[i]]}return all}
-function streak(){const s=store.get(mode==='special'?'clk-special-stats':'mp2-stats-'+pool+'-'+diff);return s?`Streak ${s.streak} · Played ${s.played}`:''}
+function streak(){if(CHID)return '';const s=store.get(mode==='special'?'clk-special-stats':'mp2-stats-'+pool+'-'+diff);return s?`Streak ${s.streak} · Played ${s.played}`:''}
 function finish(won){state.done=true;state.won=won;
-  if(mode!=='practice'){const k=mode==='special'?'clk-special-stats':'mp2-stats-'+pool+'-'+diff,s=store.get(k)||{played:0,wins:0,streak:0};
+  if(mode!=='practice'&&!CHID){const k=mode==='special'?'clk-special-stats':'mp2-stats-'+pool+'-'+diff,s=store.get(k)||{played:0,wins:0,streak:0};
     if(s.lastDay!==state.day){s.played++;if(won){s.wins++;s.streak=s.lastWin===state.day-1?s.streak+1:1;s.lastWin=state.day}else s.streak=0;s.lastDay=state.day;store.set(k,s)}}}
 function submit(id){
   if(state.done||!id)return;
@@ -395,13 +419,14 @@ let showName=store.get('clk-showname2')===true;
 const SHARE_URL='__SITE_URL__';
 function shareText(){
   const cells=state.guesses.map(g=>g===ans.id?'🟩':g==='skip'?'⬜':'🟥').join('');
+  if(CHID)return `Clocked Challenge ⏱️ Diehard\n${state.won?state.guesses.length:'X'}/${MAX} ${cells}`;
   if(mode==='special'){const sp=specialInfo();return `Clocked Daily Special #${sp.num} ⏱️ ${sp.theme}\n${state.won?state.guesses.length:'X'}/${MAX} ${cells}`}
   const tag=mode==='daily'?`Daily #${state.day+1}`:'';
   const who=showName&&state.done?(state.won?`I clocked ${ans.name} in ${state.guesses.length}/${MAX}`:`${ans.name} juked me`):`${state.won?state.guesses.length:'X'}/${MAX}`;
   return `Clocked ⏱️ ${PN[pool]} · ${DIFF[diff].label} ${tag}\n${who} ${cells}`}
-function linkURL(){return SHARE_URL?SHARE_URL+(mode==='special'?'/#special':''):''}
+function linkURL(){return SHARE_URL?SHARE_URL+(mode==='special'?(CHID?'/#c='+chEnc(CHID):'/#special'):''):''}
 function tweetURL(){return 'https://twitter.com/intent/tweet?text='+encodeURIComponent(shareText()+(linkURL()?'\n\n'+linkURL():''))}
-function specialTweetURL(){const sp=specialInfo();return 'https://twitter.com/intent/tweet?text='+encodeURIComponent(`Today's Clocked Daily Special #${sp.num} ⏱️ ${sp.theme}\nCan you clock him? 👇`+(linkURL()?'\n\n'+linkURL():''))}
+function specialTweetURL(){const sp=specialInfo();return 'https://twitter.com/intent/tweet?text='+encodeURIComponent((CHID?`Clocked Challenge ⏱️ Diehard rules, no logo\nCan you clock him? 👇`:`Today's Clocked Daily Special #${sp.num} ⏱️ ${sp.theme}\nCan you clock him? 👇`)+(linkURL()?'\n\n'+linkURL():''))}
 function copyText(t,msg){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>toast(msg),()=>toast(t));else toast(t)}
 function share(){copyText(shareText()+(linkURL()?'\n'+linkURL():''),'Result copied')}
 let tt;function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400)}
@@ -442,7 +467,7 @@ function CK(){return 'clk-cur-'+pool+'-'+diff}
 function cnt(pl){const d=dayIdx(),c=store.get('clk-cnt-'+(pl||pool));return c&&c.day===d?c:{day:d,seen:[]}}
 function count(tag){const c=cnt();if(!c.seen.includes(tag)){c.seen.push(tag);store.set('clk-cnt-'+pool,c)}}
 function left(pl){return Math.max(0,LIMIT-cnt(pl).seen.length)}
-function paintLimits(){if(mode==='special'){$('left').textContent='Daily Special · free, doesn\'t use your 6';return}const n=left();$('left').textContent=`${n} of ${LIMIT} ${PN[pool]} players left today`+(mode==='daily'?' · daily':'')}
+function paintLimits(){if(mode==='special'){$('left').textContent=CHID?'Challenge · free, doesn\'t use your 6':(showLogo()?'Daily Special · free, doesn\'t use your 6':'Team logo unlocks after 3 misses');return}const n=left();$('left').textContent=`${n} of ${LIMIT} ${PN[pool]} players left today`+(mode==='daily'?' · daily':'')}
 function showLimit(){
   ['card','clues','guesses','play','mc'].forEach(id=>$(id).hidden=true);
   $('title').textContent=`${PN[pool]} · ${DIFF[diff].label} · Random`;
@@ -473,10 +498,10 @@ async function drawGraphic(kind){
   c.textBaseline='alphabetic';c.font='700 96px Teko, Arial Narrow, sans-serif';c.fillStyle='#F2F5EF';c.fillText('CLOCK',60,128);
   const cw=c.measureText('CLOCK').width;slab(c,60+cw+6,52,112,86,'#FFD23F');c.fillStyle='#101C15';c.fillText('ED',60+cw+22,128);
   c.font='800 22px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.75)';c.textAlign='right';
-  c.fillText((mode==='special'?'Daily Special #'+specialInfo().num+' · '+specialInfo().theme:PN[pool]+' · '+DIFF[diff].label+(mode==='daily'?' · Daily #'+((state.day||0)+1):' · Random')).toUpperCase(),W-60,110);c.textAlign='left';
+  c.fillText((mode==='special'?(CHID?'Clocked Challenge · Diehard':'Daily Special #'+specialInfo().num+' · '+specialInfo().theme):PN[pool]+' · '+DIFF[diff].label+(mode==='daily'?' · Daily #'+((state.day||0)+1):' · Random')).toUpperCase(),W-60,110);c.textAlign='left';
   // card
-  const lg=LOGOS[ans.logo],X=60,Y=170,CW=620,CH=440;
-  c.save();rr(c,X,Y,CW,CH,26);c.clip();c.fillStyle=lg.c1;c.fillRect(X,Y,CW,CH);
+  const lg=LOGOS[ans.logo],tc=teamCol(),X=60,Y=170,CW=620,CH=440;
+  c.save();rr(c,X,Y,CW,CH,26);c.clip();c.fillStyle=tc.c1;c.fillRect(X,Y,CW,CH);
   const gr=c.createLinearGradient(0,Y,0,Y+CH);gr.addColorStop(0,'rgba(255,255,255,.16)');gr.addColorStop(1,'rgba(0,0,0,.2)');c.fillStyle=gr;c.fillRect(X,Y,CW,CH);
   c.strokeStyle='rgba(255,255,255,.06)';c.lineWidth=2;for(let i=-CH;i<CW;i+=18){c.beginPath();c.moveTo(X+i,Y+CH);c.lineTo(X+i+CH*.47,Y);c.stroke()}
   const sc=CH*.94/200;c.save();c.translate(X+CW/2-100*sc,Y+CH-200*sc);c.scale(sc,sc);c.fillStyle='#101C15';
@@ -488,10 +513,10 @@ async function drawGraphic(kind){
     c.save();c.translate(X+CW/2,Y+CH*.42);c.rotate(-9*Math.PI/180);c.font='700 104px Teko, Arial Narrow, sans-serif';const sl=state.won?'CLOCKED':'JUKED',sw=c.measureText(sl).width+44;
     c.fillStyle='rgba(16,28,21,.55)';c.fillRect(-sw/2,-70,sw,104);c.lineWidth=9;c.strokeStyle=state.won?'#FFD23F':'#E0402A';c.strokeRect(-sw/2,-70,sw,104);c.fillStyle=state.won?'#FFD23F':'#E0402A';c.textAlign='center';c.fillText(sl,0,18);c.restore();c.textAlign='left'}
   c.restore();
-  const showLogo=DIFF[diff].logo||state.done;
-  if(showLogo){const li=await loadImg(lg.img);const S=112,lx=X+CW-S-22,ly=Y+22;c.save();rr(c,lx,ly,S,S,24);c.fillStyle='#fff';c.fill();c.clip();if(li){const iw=li.naturalWidth||1,ih=li.naturalHeight||1,f=Math.min(S*.8/iw,S*.8/ih);c.drawImage(li,lx+(S-iw*f)/2,ly+(S-ih*f)/2,iw*f,ih*f)}c.restore();rr(c,lx,ly,S,S,24);c.lineWidth=5;c.strokeStyle='#fff';c.stroke()}
+  const logoOn=showLogo();
+  if(logoOn){const li=await loadImg(lg.img);const S=112,lx=X+CW-S-22,ly=Y+22;c.save();rr(c,lx,ly,S,S,24);c.fillStyle='#fff';c.fill();c.clip();if(li){const iw=li.naturalWidth||1,ih=li.naturalHeight||1,f=Math.min(S*.8/iw,S*.8/ih);c.drawImage(li,lx+(S-iw*f)/2,ly+(S-ih*f)/2,iw*f,ih*f)}c.restore();rr(c,lx,ly,S,S,24);c.lineWidth=5;c.strokeStyle='#fff';c.stroke()}
   c.font='700 64px Teko, Arial Narrow, sans-serif';const pw=c.measureText(ans.pos).width+36;
-  slab(c,X+CW-pw-30,Y+CH-92,10,70,lg.c2);slab(c,X+CW-pw-22,Y+CH-92,pw,70,'#fff');c.fillStyle='#101C15';c.fillText(ans.pos,X+CW-pw-22+24,Y+CH-36);
+  slab(c,X+CW-pw-30,Y+CH-92,10,70,tc.c2);slab(c,X+CW-pw-22,Y+CH-92,pw,70,'#fff');c.fillStyle='#101C15';c.fillText(ans.pos,X+CW-pw-22+24,Y+CH-36);
   // right column
   const RX=730;c.fillStyle='#F2F5EF';
   if(kind==='result'){
@@ -528,7 +553,7 @@ function copyGraphic(kind,posting){
   }catch(e){fail()}
 }
 $('challenge').onclick=()=>showGraphic('challenge');
-$('specialBtn').onclick=()=>{if(mode!=='special'){prePool=pool;preDiff=diff}mode='special';$('mDaily').setAttribute('aria-pressed',false);$('mPrac').setAttribute('aria-pressed',false);try{history.replaceState(null,'','#special')}catch(e){}load();window.scrollTo({top:0,behavior:'smooth'})};
+$('specialBtn').onclick=()=>{if(mode!=='special'){prePool=pool;preDiff=diff}CHID=null;mode='special';$('mDaily').setAttribute('aria-pressed',false);$('mPrac').setAttribute('aria-pressed',false);try{history.replaceState(null,'','#special')}catch(e){}load();window.scrollTo({top:0,behavior:'smooth'})};
 function setPool(p){exitSpecial();pool=p;if(mode==='practice'&&!canPractice())mode='daily',$('mDaily').setAttribute('aria-pressed',true),$('mPrac').setAttribute('aria-pressed',false);$('pAct').setAttribute('aria-pressed',p==='act');$('pRet').setAttribute('aria-pressed',p==='ret');$('pWk').setAttribute('aria-pressed',p==='week');load()}
 $('pWk').onclick=()=>setPool('week');
 function paintDiff(){document.querySelectorAll('#diffSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.d===diff))}
@@ -536,6 +561,7 @@ document.querySelectorAll('#diffSeg button').forEach(b=>b.onclick=()=>{exitSpeci
 function setMode(m){if(m==='practice'&&!gate())return;exitSpecial();mode=m;$('mDaily').setAttribute('aria-pressed',m==='daily');$('mPrac').setAttribute('aria-pressed',m==='practice');load()}
 $('pAct').onclick=()=>setPool('act');$('pRet').onclick=()=>setPool('ret');$('mDaily').onclick=()=>setMode('daily');$('mPrac').onclick=()=>setMode('practice');
 $('srcnote').innerHTML=`Last week: notable lines from completed ${DATA.W.season||SEASON} Week ${DATA.W.week} games. Career stats are regular-season totals through Week ${DATA.week} of ${SEASON}, from <a href="https://www.pro-football-reference.com/" target="_blank" rel="noopener">Pro Football Reference</a> via nflverse. Active: on a ${SEASON} roster. Retired: last played ${SEASON-2} or earlier, drafted 1980 or later.`;
-if(location.hash==='#special'){prePool=pool;preDiff=diff;mode='special';$('mDaily').setAttribute('aria-pressed',false);$('mPrac').setAttribute('aria-pressed',false)}
+window.addEventListener('hashchange',()=>location.reload());
+if(location.hash==='#special'||CHID){prePool=pool;preDiff=diff;mode='special';$('mDaily').setAttribute('aria-pressed',false);$('mPrac').setAttribute('aria-pressed',false)}
 load();
 </script>
