@@ -19,7 +19,7 @@ h1{margin:0 0 4px;font-family:var(--display);font-weight:700;font-size:44px;line
 h1 span{background:var(--chyron);color:var(--ink);padding:4px 8px 0;display:inline-block;transform:skewX(var(--skew));margin-left:4px}
 .note{font-size:12px;opacity:.7;margin-bottom:12px}
 .panel{background:var(--slab);padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
-label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
+label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(242,245,239,.9)}
 input[type=text],textarea,select{font:600 15px var(--body);padding:10px 12px;border:0;border-radius:3px;background:var(--paper);color:var(--ink);width:100%}
 textarea{min-height:84px;resize:vertical;font-weight:500}
 input:focus,textarea:focus,select:focus{outline:3px solid var(--chyron)}
@@ -29,9 +29,11 @@ input:focus,textarea:focus,select:focus{outline:3px solid var(--chyron)}
 .row{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;font-weight:600}
 .row label{flex-direction:row;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px}
 .search{position:relative}
-.sugg{position:absolute;left:0;right:0;top:100%;margin:4px 0 0;padding:4px 0;list-style:none;background:var(--paper);color:var(--ink);z-index:5;max-height:300px;overflow:auto;box-shadow:0 8px 0 rgba(0,0,0,.25)}
-.sugg li{padding:8px 12px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
-.sugg li small{color:var(--muted);font-weight:700;white-space:nowrap}
+.sugg{position:absolute;left:0;right:0;top:100%;margin:4px 0 0;padding:4px 0;list-style:none;background:var(--paper);color:var(--ink);z-index:50;border-radius:3px;max-height:300px;overflow:auto;box-shadow:0 8px 0 rgba(0,0,0,.25)}
+.sugg li{padding:9px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;font:600 14px var(--body);text-transform:none;letter-spacing:0;color:var(--ink);border-left:4px solid transparent}
+.sugg li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sugg li[aria-selected=true]{border-left-color:var(--chyron)}
+.sugg li small{color:var(--muted);font:700 12px var(--body);white-space:nowrap}
 .sugg li[aria-selected=true]{background:#F3F6F2}
 .picked{font-size:13px;opacity:.85}
 .preview{min-width:0;display:flex;flex-direction:column;gap:12px}
