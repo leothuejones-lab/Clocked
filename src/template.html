@@ -282,7 +282,7 @@ const SIL=`<svg viewBox="0 0 200 200" aria-hidden="true"><ellipse cx="100" cy="7
 const PN={act:'Active',ret:'Retired',week:'Last week'};
 let pool='act',mode='practice',ans,state;
 
-function photoChain(p){const u=[];if(p.espn)u.push(`https://a.espncdn.com/i/headshots/nfl/players/full/${p.espn}.png`);if(p.hs&&!/\/private\//.test(p.hs))u.push(p.hs);return u}
+function photoChain(p){const e=p.espn?`https://a.espncdn.com/i/headshots/nfl/players/full/${p.espn}.png`:null,n=p.hs?p.hs.replace('/f_auto,q_auto/','/f_auto,q_auto,w_500/'):null;return (p.active===false?[n,e]:[e,n]).filter(Boolean)}
 function setPhoto(p){
   const b=$('bust');b.innerHTML='';const urls=photoChain(p);let i=0;
   const fallback=()=>{b.innerHTML=SIL+(state.done?'':'<span class="q">?</span>')};
