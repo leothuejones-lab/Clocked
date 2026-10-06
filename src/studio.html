@@ -45,6 +45,12 @@ input:focus,textarea:focus,select:focus{outline:3px solid var(--chyron)}
 .btn.dark{background:var(--ink);color:#fff;box-shadow:0 4px 0 #000}
 .btn.ghost{background:var(--slab);color:var(--chalk);box-shadow:0 4px 0 #031009}
 .btn:focus-visible,.seg button:focus-visible{outline:3px solid var(--chyron);outline-offset:2px}
+.tpl{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tpl button{font:800 12px var(--body);text-transform:uppercase;letter-spacing:.05em;border:0;background:var(--turf);color:var(--chalk);padding:10px 8px;cursor:pointer;text-align:left}
+.tpl button small{display:block;font:600 11px var(--body);text-transform:none;letter-spacing:0;opacity:.7;margin-top:2px}
+.tpl button[aria-pressed=true]{background:var(--chyron);color:var(--ink)}
+.tpl button:focus-visible{outline:3px solid var(--chyron);outline-offset:2px}
+select{padding:8px 10px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--chyron);color:var(--ink);padding:9px 16px;font-weight:800;box-shadow:0 4px 0 var(--chyron-dk);max-width:calc(100vw - 32px)}
 </style>
 </head>
@@ -52,14 +58,19 @@ input:focus,textarea:focus,select:focus{outline:3px solid var(--chyron)}
 <div class="wrap">
   <div class="panel">
     <div><h1>Clock<span>ed</span> Studio</h1><div class="note">Private creator tool. Not linked from the game.</div></div>
-    <div><div class="seg" id="srcSeg"><button data-s="player" aria-pressed="true">Any player</button><button data-s="week" aria-pressed="false">Last week line</button></div></div>
-    <label class="search" for="q">Search<input id="q" type="text" placeholder="Type a name" autocomplete="off"><ul class="sugg" id="sugg" hidden></ul></label>
-    <div class="picked" id="picked">Nothing picked yet.</div>
-    <div><div class="seg" id="kindSeg"><button data-k="mystery" aria-pressed="true">Mystery</button><button data-k="reveal" aria-pressed="false">Reveal</button></div></div>
+    <div class="tpl" id="tplSeg"><button data-t="puzzle" aria-pressed="true">Puzzle<small>Who is this? / reveal</small></button><button data-t="spot" aria-pressed="false">Spotlight<small>One player, by the numbers</small></button><button data-t="vs" aria-pressed="false">Head-to-head<small>Who ya got?</small></button><button data-t="week" aria-pressed="false">Week's best<small>Top lines from Week <span id="wkN"></span></small></button></div>
+    <div data-for="puzzle"><div class="seg" id="srcSeg"><button data-s="player" aria-pressed="true">Any player</button><button data-s="week" aria-pressed="false">Last week line</button></div></div>
+    <label class="search" for="q" data-for="puzzle spot vs"><span id="qLabel">Search</span><input id="q" type="text" placeholder="Type a name" autocomplete="off"><ul class="sugg" id="sugg" hidden></ul></label>
+    <div class="picked" id="picked" data-for="puzzle spot vs">Nothing picked yet.</div>
+    <label class="search" for="q2" data-for="vs">Player B<input id="q2" type="text" placeholder="Type a name" autocomplete="off"><ul class="sugg" id="sugg2" hidden></ul></label>
+    <div class="picked" id="picked2" data-for="vs">Nothing picked yet.</div>
+    <div data-for="week"><div class="seg" id="wposSeg"><button data-p="all" aria-pressed="true">All</button><button data-p="QB" aria-pressed="false">QB</button><button data-p="RB" aria-pressed="false">RB</button><button data-p="REC" aria-pressed="false">WR/TE</button><button data-p="DEF" aria-pressed="false">Defense</button></div></div>
+    <label for="wcount" data-for="week">How many<select id="wcount"><option>3</option><option>4</option><option selected>5</option></select></label>
+    <div data-for="puzzle"><div class="seg" id="kindSeg"><button data-k="mystery" aria-pressed="true">Mystery</button><button data-k="reveal" aria-pressed="false">Reveal</button></div></div>
     <label for="headline">Headline<input id="headline" type="text"></label>
     <label for="footer">Bottom line<input id="footer" type="text"></label>
     <label for="tag">Top-right tag<input id="tag" type="text"></label>
-    <div class="row"><label><input type="checkbox" id="showLogo" checked> Team logo</label><label><input type="checkbox" id="showStats" checked> Stats</label><label><input type="checkbox" id="showPos" checked> Position</label></div>
+    <div class="row" data-for="puzzle"><label><input type="checkbox" id="showLogo" checked> Team logo</label><label><input type="checkbox" id="showStats" checked> Stats</label><label><input type="checkbox" id="showPos" checked> Position</label></div>
     <label for="tweet">Tweet text<textarea id="tweet"></textarea></label>
   </div>
   <div class="preview">
@@ -81,7 +92,7 @@ const LOGOS=DATA.logos, P=DATA.P, W=DATA.W;
 const fmt=n=>typeof n==='number'?(Number.isInteger(n)?n.toLocaleString('en-US'):n.toFixed(1)):n;
 const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'');
 const OPP={ARI:'Arizona',ATL:'Atlanta',BAL:'Baltimore',BUF:'Buffalo',CAR:'Carolina',CHI:'Chicago',CIN:'Cincinnati',CLE:'Cleveland',DAL:'Dallas',DEN:'Denver',DET:'Detroit',GB:'Green Bay',HOU:'Houston',IND:'Indianapolis',JAX:'Jacksonville',KC:'Kansas City',LA:'LA Rams',LAC:'LA Chargers',LV:'Las Vegas',MIA:'Miami',MIN:'Minnesota',NE:'New England',NO:'New Orleans',NYG:'NY Giants',NYJ:'NY Jets',PHI:'Philadelphia',PIT:'Pittsburgh',SEA:'Seattle',SF:'San Francisco',TB:'Tampa Bay',TEN:'Tennessee',WAS:'Washington'};
-let src='player',kind='mystery',pick=null,touched={headline:false,footer:false,tag:false,tweet:false};
+let tpl='puzzle',wpos='all',pick2=null,src='player',kind='mystery',pick=null,touched={headline:false,footer:false,tag:false,tweet:false};
 const siteShort=(SITE||'Clocked').replace(/^https?:\/\//,'');
 
 /* ---------- search ---------- */
@@ -109,13 +120,39 @@ $('q').addEventListener('keydown',e=>{if($('sugg').hidden)return;
   else if(e.key==='Enter'){choose(matches[sel]);e.preventDefault()}else if(e.key==='Escape')$('sugg').hidden=true});
 $('sugg').addEventListener('mousedown',e=>{const li=e.target.closest('li');if(li){e.preventDefault();choose(matches[+li.dataset.i])}});
 document.addEventListener('click',e=>{if(!e.target.closest('.search'))$('sugg').hidden=true});
-function choose(x){pick=x;$('sugg').hidden=true;$('q').value=src==='player'?x.name:x.name;
+function choose(x){if(tpl!=='puzzle'&&src!=='player')return;pick=x;$('sugg').hidden=true;$('q').value=src==='player'?x.name:x.name;
   $('picked').textContent=src==='player'?`${x.name} · ${x.pos} · ${x.yrs[0]}–${x.active?'now':x.yrs[1]}${x.pb?` · ${x.pb}× Pro Bowl`:''}`:`${x.name} · ${x.pos} · ${x.team} ${x.home?'vs':'at'} ${OPP[x.opp]||x.opp} · ${x.line.join(', ')}`;
   touched={headline:false,footer:false,tag:false,tweet:false};defaults();draw()}
+
+/* ---------- player B search (head-to-head) ---------- */
+let m2=[],s2=0;
+function showSugg2(){const q=norm($('q2').value.trim()),S=$('sugg2');if(q.length<2){S.hidden=true;return}
+  const a=[],b=[];for(const [n,x] of PIDX){if(n.startsWith(q)||n.split(' ').some(w=>w.startsWith(q)))a.push(x);else if(n.includes(q))b.push(x)}
+  a.sort((x,y)=>(y.active-x.active)||(y.pb-x.pb));m2=a.concat(b).slice(0,10);s2=0;if(!m2.length){S.hidden=true;return}
+  S.innerHTML=m2.map((x,i)=>`<li data-i="${i}" aria-selected="${i===s2}"><span>${x.label}</span><small>${x.pos} · ${x.yrs[0]}${x.active?'–now':'–'+x.yrs[1]}</small></li>`).join('');S.hidden=false}
+function choose2(x){pick2=x;$('sugg2').hidden=true;$('q2').value=x.name;$('picked2').textContent=`${x.name} · ${x.pos} · ${x.yrs[0]}–${x.active?'now':x.yrs[1]}${x.pb?` · ${x.pb}× Pro Bowl`:''}`;touched.headline=touched.tweet=false;defaults();draw()}
+$('q2').addEventListener('input',showSugg2);
+$('q2').addEventListener('keydown',e=>{if($('sugg2').hidden)return;const S=$('sugg2');
+  if(e.key==='ArrowDown'){s2=(s2+1)%m2.length;e.preventDefault()}else if(e.key==='ArrowUp'){s2=(s2-1+m2.length)%m2.length;e.preventDefault()}
+  else if(e.key==='Enter'){choose2(m2[s2]);e.preventDefault();return}else if(e.key==='Escape'){S.hidden=true;return}
+  [...S.children].forEach((li,i)=>li.setAttribute('aria-selected',i===s2))});
+$('sugg2').addEventListener('mousedown',e=>{const li=e.target.closest('li');if(li){e.preventDefault();choose2(m2[+li.dataset.i])}});
+document.addEventListener('click',e=>{if(!e.target.closest('.search'))$('sugg2').hidden=true});
+$('wkN').textContent=W.week;
+function showFor(){document.querySelectorAll('[data-for]').forEach(el=>el.hidden=!el.dataset.for.split(' ').includes(tpl));$('qLabel').textContent=tpl==='vs'?'Player A':'Search'}
+const WPOS={QB:p=>p==='QB',RB:p=>p==='RB'||p==='FB',REC:p=>p==='WR'||p==='TE'};
+function weekRows(){const n=+$('wcount').value;return W.lines.filter(l=>wpos==='all'||(wpos==='DEF'?!['QB','RB','FB','WR','TE'].includes(l.pos):WPOS[wpos](l.pos))).sort((a,b)=>b.score_key-a.score_key).slice(0,n)}
+const WPN={all:'',QB:'QB ',RB:'RB ',REC:'WR/TE ',DEF:'DEFENSIVE '};
 
 /* ---------- defaults ---------- */
 function defaults(){
   const set=(id,v)=>{if(!touched[id])$(id).value=v};
+  if(tpl==='spot'){set('headline',pick?pick.name.toUpperCase():'PLAYER SPOTLIGHT');set('footer','Play daily at '+siteShort);set('tag',pick&&pick.hof?'HALL OF FAME':'BY THE NUMBERS');
+    set('tweet',pick?`${pick.name}, by the numbers 📊\nUnderrated or overrated? 👇`:'');return}
+  if(tpl==='vs'){set('headline','WHO YA GOT?');set('footer','Play daily at '+siteShort);set('tag','HEAD TO HEAD');
+    set('tweet',pick&&pick2?`${pick.name} or ${pick2.name}? 🤔\nWho ya got? 👇`:'Who ya got? 👇');return}
+  if(tpl==='week'){set('headline',`WEEK ${W.week}'S BEST ${WPN[wpos]}LINES`);set('footer','Play daily at '+siteShort);set('tag','WEEK '+W.week+' · '+W.season);
+    set('tweet',`Best ${WPN[wpos].toLowerCase()}lines of Week ${W.week} 🔥\nWho'd we miss? 👇`);return}
   if(kind==='mystery'){set('headline','WHO IS THIS?');set('footer','Reply with your guess');}
   else{set('headline',pick?'IT WAS '+pick.name.toUpperCase():'IT WAS…');set('footer','Play daily at '+siteShort);}
   set('tag',src==='week'?'WEEK '+W.week+' · '+W.season:'CLOCKED');
@@ -129,6 +166,10 @@ function defaults(){
 function segs(id,attr,fn){document.querySelectorAll('#'+id+' button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#'+id+' button').forEach(x=>x.setAttribute('aria-pressed',x===b));fn(b.dataset[attr])})}
 segs('srcSeg','s',v=>{src=v;pick=null;$('q').value='';$('picked').textContent='Nothing picked yet.';$('q').placeholder=v==='week'?'Filter by name or team':'Type a name';touched={headline:false,footer:false,tag:false,tweet:false};defaults();draw();if(v==='week'){$('q').focus();showSugg()}});
 segs('kindSeg','k',v=>{kind=v;touched.headline=touched.footer=touched.tweet=false;defaults();draw()});
+segs('tplSeg','t',v=>{tpl=v;if(v!=='puzzle'&&src!=='player'){src='player';pick=null;$('q').value='';$('picked').textContent='Nothing picked yet.';document.querySelectorAll('#srcSeg button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.s==='player'))}
+  touched={headline:false,footer:false,tag:false,tweet:false};showFor();defaults();draw()});
+segs('wposSeg','p',v=>{wpos=v;touched.headline=touched.tweet=false;defaults();draw()});
+$('wcount').addEventListener('change',draw);
 
 /* ---------- drawing ---------- */
 const cv=$('cv'),c=cv.getContext('2d'),WD=1200,HT=675;
@@ -139,9 +180,73 @@ const imgCache={};function img(src){if(!imgCache[src]){imgCache[src]=new Promise
 function fitText(t,maxW,size,weight,fam){let s=size;c.font=`${weight} ${s}px ${fam}`;while(c.measureText(t).width>maxW&&s>20){s-=2;c.font=`${weight} ${s}px ${fam}`}return s}
 function wrap(t,maxW){const words=t.split(/\s+/);const lines=[];let cur='';for(const w of words){const n=cur?cur+' '+w:w;if(c.measureText(n).width>maxW&&cur){lines.push(cur);cur=w}else cur=n}if(cur)lines.push(cur);return lines}
 let drawing=0;
+function header(){
+  c.clearRect(0,0,WD,HT);c.fillStyle='#0C3A25';c.fillRect(0,0,WD,HT);c.fillStyle='rgba(255,255,255,.03)';for(let x=0;x<WD;x+=128)c.fillRect(x,0,64,HT);
+  c.textBaseline='alphabetic';c.textAlign='left';
+  c.font='700 96px Teko, Arial Narrow, sans-serif';c.fillStyle='#F2F5EF';c.fillText('CLOCK',60,128);
+  const cw=c.measureText('CLOCK').width;slab(60+cw+6,52,112,86,'#FFD23F');c.fillStyle='#101C15';c.fillText('ED',60+cw+22,128);
+  c.font='800 22px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.75)';c.textAlign='right';c.fillText(($('tag').value||'').toUpperCase(),WD-60,110);c.textAlign='left'}
+function logoTile(li,x,y,S){c.save();rr(x,y,S,S,S*.22);c.fillStyle='#fff';c.fill();c.clip();if(li){const iw=li.naturalWidth||1,ih=li.naturalHeight||1,f=Math.min(S*.8/iw,S*.8/ih);c.drawImage(li,x+(S-iw*f)/2,y+(S-ih*f)/2,iw*f,ih*f)}c.restore()}
+function stripes(X,Y,CW,CH,col){c.save();rr(X,Y,CW,CH,22);c.clip();c.fillStyle=col;c.fillRect(X,Y,CW,CH);const gr=c.createLinearGradient(0,Y,0,Y+CH);gr.addColorStop(0,'rgba(255,255,255,.16)');gr.addColorStop(1,'rgba(0,0,0,.22)');c.fillStyle=gr;c.fillRect(X,Y,CW,CH);
+  c.strokeStyle='rgba(255,255,255,.06)';c.lineWidth=2;for(let i=-CH;i<CW;i+=18){c.beginPath();c.moveTo(X+i,Y+CH);c.lineTo(X+i+CH*.47,Y);c.stroke()}c.restore()}
+const yrs=p=>p.yrs[0]+'–'+(p.active?'now':p.yrs[1]);
+function honors(p){return [p.hof?'HALL OF FAME':'',p.pb?p.pb+'× PRO BOWL':'',p.ap?p.ap+'× ALL-PRO':''].filter(Boolean)}
+function badges(list,x,y,maxX){c.font='600 30px Teko, Arial Narrow, sans-serif';for(const t of list){const w=c.measureText(t).width+30;if(x+w>maxX)break;slab(x,y,w,40,t==='HALL OF FAME'?'#F2F5EF':'#FFD23F');c.fillStyle='#101C15';c.fillText(t,x+15,y+31);x+=w+10}}
+function footerLine(x,align){c.font='600 26px Archivo, Arial, sans-serif';c.fillStyle='#FFD23F';c.textAlign=align||'left';c.fillText($('footer').value||'',x,HT-48);c.textAlign='left'}
+function emptyMsg(t){c.font='600 40px Teko, Arial Narrow, sans-serif';c.fillStyle='rgba(242,245,239,.6)';c.textAlign='center';c.fillText(t,WD/2,HT/2+20);c.textAlign='left'}
+async function drawSpot(my){
+  const lg=pick?LOGOS[pick.logo]:null,li=lg?await img(lg.img):null;if(my!==drawing)return;header();
+  if(!pick){emptyMsg('Search a player to build a spotlight');return}
+  const X=60,Y=170,CW=420,CH=440;stripes(X,Y,CW,CH,lg.c1);logoTile(li,X+(CW-220)/2,Y+70,220);
+  c.font='700 64px Teko, Arial Narrow, sans-serif';const pw=c.measureText(pick.pos).width+36;slab(X+CW-pw-30,Y+CH-92,10,70,lg.c2);slab(X+CW-pw-22,Y+CH-92,pw,70,'#fff');c.fillStyle='#101C15';c.fillText(pick.pos,X+CW-pw-22+24,Y+CH-36);
+  const RX=530,RW=WD-RX-60;const hl=($('headline').value||'').toUpperCase();
+  const fs=fitText(hl,RW,96,700,'Teko, Arial Narrow, sans-serif');c.fillStyle='#F2F5EF';c.fillText(hl,RX,170+fs*.78);
+  c.font='800 20px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.72)';c.fillText(`${pick.pos} · ${yrs(pick)} · ${fmt(pick.games)} GAMES${pick.active?' · ACTIVE':''}`.toUpperCase(),RX,170+fs*.78+38);
+  const st=pick.stats.slice(0,4),cols=2,colW=RW/cols;st.forEach((s,i)=>{const x=RX+(i%cols)*colW,y=340+Math.floor(i/cols)*112;
+    c.fillStyle='#F2F5EF';fitText(fmt(s[1]),colW-24,88,700,'Teko, Arial Narrow, sans-serif');c.fillText(fmt(s[1]),x,y+50);
+    c.font='800 17px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.7)';c.fillText(s[0].toUpperCase(),x,y+78)});
+  badges(honors(pick),RX,HT-128,WD-60);footerLine(RX)}
+async function drawVs(my){
+  const la=pick?LOGOS[pick.logo]:null,lb=pick2?LOGOS[pick2.logo]:null,ia=la?await img(la.img):null,ib=lb?await img(lb.img):null;if(my!==drawing)return;header();
+  const hl=($('headline').value||'').toUpperCase();c.fillStyle='#F2F5EF';const fs=fitText(hl,WD-560,64,700,'Teko, Arial Narrow, sans-serif');c.textAlign='center';c.fillText(hl,WD/2,96+fs*.36);c.textAlign='left';
+  if(!pick||!pick2){emptyMsg(!pick?'Pick player A':'Pick player B');return}
+  const side=(p,lg,li,x)=>{stripes(x,166,500,116,lg.c1);logoTile(li,x+18,180,88);c.fillStyle='#fff';const nm=p.name.toUpperCase();fitText(nm,360,54,700,'Teko, Arial Narrow, sans-serif');c.fillText(nm,x+122,232);
+    c.font='800 17px Archivo, Arial, sans-serif';c.fillStyle='rgba(255,255,255,.85)';c.fillText(`${p.pos} · ${yrs(p)}`.toUpperCase(),x+122,264)};
+  side(pick,la,ia,60);side(pick2,lb,ib,640);
+  c.save();c.translate(600,224);slab(-38,-30,76,60,'#FFD23F');c.restore();c.font='700 46px Teko, Arial Narrow, sans-serif';c.fillStyle='#101C15';c.textAlign='center';c.fillText('VS',600-4,241);c.textAlign='left';
+  const A=pick.stats,B=pick2.stats,same=A.length===B.length&&A.every((s,i)=>s[0]===B[i][0]),rows=[];
+  const lowerBetter=(lab)=>pick.pos==='QB'&&pick2.pos==='QB'&&lab==='INT';
+  if(same)A.forEach((s,i)=>{const a=s[1],b=B[i][1],lb2=lowerBetter(s[0]);rows.push({lab:s[0],l:fmt(a),r:fmt(b),win:a===b?null:((a>b)!==lb2?'l':'r')})});
+  else for(let i=0;i<Math.max(A.length,B.length);i++)rows.push({lab:'',l:A[i]?fmt(A[i][1])+' '+A[i][0]:'',r:B[i]?fmt(B[i][1])+' '+B[i][0]:'',win:null});
+  rows.push({lab:'Pro Bowls',l:String(pick.pb),r:String(pick2.pb),win:pick.pb===pick2.pb?null:pick.pb>pick2.pb?'l':'r'});
+  if(pick.ap||pick2.ap)rows.push({lab:'1st-team All-Pro',l:String(pick.ap),r:String(pick2.ap),win:pick.ap===pick2.ap?null:pick.ap>pick2.ap?'l':'r'});
+  const step=Math.min(62,(HT-96-306)/rows.length),top=306+step*.78;
+  rows.forEach((r,i)=>{const y=top+i*step;if(i%2===0){c.fillStyle='rgba(255,255,255,.04)';c.fillRect(60,y-step*.72,WD-120,step)}
+    c.font='800 17px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.7)';c.textAlign='center';c.fillText(r.lab.toUpperCase(),WD/2,y-step*.22);
+    c.font=`600 ${same||!r.lab?Math.round(step*.9):Math.round(step*.9)}px Teko, Arial Narrow, sans-serif`;
+    c.textAlign='right';c.fillStyle=r.win==='l'?'#FFD23F':r.win==='r'?'rgba(242,245,239,.55)':'#F2F5EF';c.fillText(r.l,WD/2-150,y);
+    c.textAlign='left';c.fillStyle=r.win==='r'?'#FFD23F':r.win==='l'?'rgba(242,245,239,.55)':'#F2F5EF';c.fillText(r.r,WD/2+150,y)});
+  c.textAlign='left';footerLine(WD/2,'center')}
+async function drawWeek(my){
+  const rows=weekRows(),lis=await Promise.all(rows.map(r=>LOGOS[r.team]?img(LOGOS[r.team].img):null));if(my!==drawing)return;header();
+  const hl=($('headline').value||'').toUpperCase();c.fillStyle='#F2F5EF';const fs=fitText(hl,WD-120,76,700,'Teko, Arial Narrow, sans-serif');c.fillText(hl,60,150+fs*.75);
+  if(!rows.length){emptyMsg('No lines for that position this week');return}
+  const top=236,avail=HT-100-top,rh=Math.min(84,avail/rows.length);
+  rows.forEach((r,i)=>{const y=top+i*rh;if(i%2===0){c.fillStyle='rgba(255,255,255,.05)';c.fillRect(60,y,WD-120,rh-6)}
+    const mid=y+(rh-6)/2;c.font=`700 ${Math.round(rh*.62)}px Teko, Arial Narrow, sans-serif`;c.fillStyle='#FFD23F';c.textAlign='center';c.fillText(String(i+1),104,mid+rh*.22);c.textAlign='left';
+    const S=Math.round(rh*.62);logoTile(lis[i],140,mid-S/2,S);
+    const nx=140+S+18;c.fillStyle='#F2F5EF';fitText(r.name.toUpperCase(),330,Math.round(rh*.5),700,'Teko, Arial Narrow, sans-serif');c.fillText(r.name.toUpperCase(),nx,mid+4);
+    c.font='800 14px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.65)';const res=r.score[0]>r.score[1]?'W':r.score[0]<r.score[1]?'L':'T';c.fillText(`${r.pos} · ${r.team} ${r.home?'VS':'AT'} ${r.opp} · ${res} ${r.score[0]}-${r.score[1]}`,nx,mid+26);
+    const ln=r.line.join(' · ');c.fillStyle='#F2F5EF';fitText(ln,WD-60-(nx+360),Math.round(rh*.46),600,'Teko, Arial Narrow, sans-serif');c.textAlign='right';c.fillText(ln,WD-80,mid+rh*.16);c.textAlign='left'});
+  footerLine(60)}
+function finishDraw(){
+  $('postBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(($('tweet').value||'')+(SITE?'\n\n'+SITE:''));
+  const nm=tpl==='week'?'week-'+W.week+'-best':tpl==='vs'?(pick&&pick2?norm(pick.name).replace(/ /g,'-')+'-vs-'+norm(pick2.name).replace(/ /g,'-'):'vs'):(pick?norm(pick.name).replace(/ /g,'-'):'graphic')+'-'+(tpl==='spot'?'spotlight':kind);
+  try{$('dlBtn').href=cv.toDataURL('image/png');$('dlBtn').download='clocked-'+nm+'.png'}catch(e){}}
 async function draw(){
   const my=++drawing;
   try{await Promise.all(['700 96px Teko','600 40px Teko','800 24px Archivo','600 24px Archivo'].map(f=>document.fonts.load(f)))}catch(e){}
+  if(tpl!=='puzzle'){await (tpl==='spot'?drawSpot:tpl==='vs'?drawVs:drawWeek)(my);if(my===drawing)finishDraw();return}
   const lg=pick?LOGOS[pick.logo||pick.team]:null;
   const li=lg&&$('showLogo').checked?await img(lg.img):null;
   if(my!==drawing)return;
@@ -193,7 +298,7 @@ function copyImg(posting){
   catch(e){toast('Copy blocked. Use Download instead.')}
 }
 $('copyBtn').onclick=()=>copyImg(false);$('postBtn').addEventListener('click',()=>copyImg(true));
-defaults();draw();
+showFor();defaults();draw();
 </script>
 </body>
 </html>
