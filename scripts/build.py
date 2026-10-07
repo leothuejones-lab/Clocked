@@ -337,8 +337,48 @@ log(f'done: index.html ({len(html) // 1024} KB), stats through {SEASON} week {WE
 # ---------- 8. creator studio (unlinked page: any player, any graphic) ----------
 stpl = os.path.join(ROOT, 'src', 'studio.html')
 if os.path.exists(stpl):
-    SP = [{k: p[k] for k in ['name', 'label', 'pos', 'active', 'yrs', 'games', 'pb', 'ap', 'hof', 'stats', 'logo']} for p in allp]
-    SDATA = {'P': SP, 'logos': logos, 'W': {'week': WW, 'season': WS, 'lines': [{k: x[k] for k in ['name', 'pos', 'team', 'opp', 'home', 'score', 'line', 'score_key']} for x in lines]}}
+    SP = [{k: p[k] for k in ['id', 'name', 'label', 'pos', 'active', 'yrs', 'games', 'pb', 'ap', 'hof', 'stats', 'logo']} for p in allp]
+    # Season + single-game numbers for the Spotlight template (regular season, from nflverse game logs, 1999+).
+    # Same stat columns as the career card so the layout stays identical.
+    SCOL = {'QB': [('Pass Yds', 'passing_yards'), ('Pass TD', 'passing_tds'), ('INT', 'passing_interceptions'), ('Rush Yds', 'rushing_yards')],
+            'RB': [('Rush Yds', 'rushing_yards'), ('Rush TD', 'rushing_tds'), ('Rec', 'receptions'), ('Rec Yds', 'receiving_yards')],
+            'WR': [('Rec', 'receptions'), ('Rec Yds', 'receiving_yards'), ('Rec TD', 'receiving_tds')],
+            'DB': [('INT', 'def_interceptions'), ('Sacks', 'def_sacks')],
+            'DEF': [('Sacks', 'def_sacks'), ('INT', 'def_interceptions')]}
+    def scols(pos):
+        g = POS[pos]
+        return SCOL['QB'] if g == 'QB' else SCOL['RB'] if g == 'RB' else SCOL['WR'] if g in ('WR', 'TE') else SCOL['DB'] if g == 'DB' else SCOL['DEF']
+    gpos = {p['id']: p['pos'] for p in allp}
+    lg = ps[ps.player_id.isin(gpos.keys())].copy()
+    for col in ['passing_yards', 'passing_tds', 'passing_interceptions', 'rushing_yards', 'rushing_tds', 'receptions', 'receiving_yards', 'receiving_tds', 'def_sacks', 'def_interceptions']:
+        lg[col] = lg[col].fillna(0)
+    gm = games.set_index('game_id')[['home_team', 'home_score', 'away_score']]
+    SEAS, GAMES, TN = {}, {}, []
+    def tn(n):
+        if n not in TN: TN.append(n)
+        return TN.index(n)
+    for pid, x in lg.groupby('player_id'):
+        cols = [c for _, c in scols(gpos[pid])]
+        rows = []
+        for se, y in x.groupby('season'):
+            vc = y.team.dropna().value_counts()
+            if not len(vc): continue
+            tm = vc.index[0]; tname = team(tm, int(se))
+            rows.append([int(se), tn(tname), LOGO[tname], int(len(y)), y.team.nunique()] + [num(y[c].sum()) for c in cols])
+        SEAS[pid] = rows
+        rec = x[x.season >= SEASON - 1].sort_values(['season', 'week'])
+        if len(rec):
+            out = []
+            for r in rec.itertuples():
+                if r.game_id not in gm.index or not isinstance(r.team, str): continue
+                g = gm.loc[r.game_id]; home = g.home_team == r.team
+                ts, os_ = (g.home_score, g.away_score) if home else (g.away_score, g.home_score)
+                if pd.isna(ts): continue
+                tname = team(r.team, int(r.season))
+                out.append([int(r.season), int(r.week), r.team, LOGO[tname], r.opponent_team, bool(home), int(ts), int(os_)] + [num(getattr(r, c)) for c in cols])
+            if out: GAMES[pid] = out
+    log(f'   studio: season lines for {len(SEAS)} players, game logs for {len(GAMES)}')
+    SDATA = {'P': SP, 'S': SEAS, 'G': GAMES, 'TN': TN, 'logos': logos, 'W': {'week': WW, 'season': WS, 'lines': [{k: x[k] for k in ['name', 'pos', 'team', 'opp', 'home', 'score', 'line', 'score_key']} for x in lines]}}
     shtml = open(stpl, encoding='utf-8').read().replace('/*DATA*/null', json.dumps(SDATA, separators=(',', ':'))).replace('__SITE_URL__', SITE_URL)
     open(os.path.join(ROOT, 'studio.html'), 'w', encoding='utf-8').write(shtml)
     log(f'done: studio.html ({len(shtml) // 1024} KB)')
