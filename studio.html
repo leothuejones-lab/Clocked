@@ -198,7 +198,8 @@ function fillScope(){
   $('gameSel').innerHTML=gg.slice().reverse().map((g,i)=>`<option value="${gg.length-1-i}">${g[0]} Wk ${g[1]} · ${g[5]?'vs':'at'} ${g[4]} · ${g[6]>g[7]?'W':g[6]<g[7]?'L':'T'} ${g[6]}-${g[7]}</option>`).join('')||'<option value="">No games this season or last</option>';
   paintScope()}
 function seasonOpts(p){return '<option value="">Career</option>'+seasonsOf(p).slice().reverse().map(r=>`<option value="${r[0]}">${r[0]} season · ${TNAMES[r[1]]}</option>`).join('')}
-function fillVs(){$('vsA').innerHTML=seasonOpts(pick);$('vsB').innerHTML=seasonOpts(pick2)}
+let vsFor={A:null,B:null};
+function fillVs(){[['vsA','A',pick],['vsB','B',pick2]].forEach(([id,k,p])=>{const el=$(id),keep=vsFor[k]===(p&&p.id)?el.value:'';el.innerHTML=seasonOpts(p);el.value=[...el.options].some(o=>o.value===keep)?keep:'';vsFor[k]=p&&p.id})}
 ['vsA','vsB'].forEach(id=>$(id).addEventListener('change',()=>{touched.tweet=touched.tag=false;defaults();draw()}));
 function vsView(p,yr){if(!yr)return {logo:p.logo,sub:`${p.pos} · ${yrs(p)}`,stats:p.stats,career:true,label:p.name};const r=seasonsOf(p).find(r=>String(r[0])===yr);
   return {logo:r[2],sub:`${r[0]} · ${TNAMES[r[1]]}`,stats:p.stats.map((s,i)=>[s[0],r[5+i]]),career:false,label:r[0]+' '+p.name}}
