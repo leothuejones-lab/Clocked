@@ -315,7 +315,7 @@ def wikidata_photos(pfr_ids):
         log(f'   wikidata photos unavailable ({e}); using {len(out)} cached')
     return out
 
-WD = wikidata_photos(p['pfr'] for p in allp if p['id'] in keep)
+WD = wikidata_photos(p['pfr'] for p in allp)  # all players: the studio can put a face on anyone
 def commons_path(name):
     # upload.wikimedia.org stores files under md5-based folders: thumb/1/11/File_name.jpg
     if not name: return None
@@ -337,7 +337,7 @@ log(f'done: index.html ({len(html) // 1024} KB), stats through {SEASON} week {WE
 # ---------- 8. creator studio (unlinked page: any player, any graphic) ----------
 stpl = os.path.join(ROOT, 'src', 'studio.html')
 if os.path.exists(stpl):
-    SP = [{k: p[k] for k in ['id', 'name', 'label', 'pos', 'active', 'yrs', 'games', 'pb', 'ap', 'hof', 'stats', 'logo']} for p in allp]
+    SP = [{k: p[k] for k in ['id', 'name', 'label', 'pos', 'active', 'yrs', 'games', 'pb', 'ap', 'hof', 'stats', 'logo', 'espn', 'hs', 'wd']} for p in allp]
     # Season + single-game numbers for the Spotlight template (regular season, from nflverse game logs, 1999+).
     # Same stat columns as the career card so the layout stays identical.
     SCOL = {'QB': [('Pass Yds', 'passing_yards'), ('Pass TD', 'passing_tds'), ('INT', 'passing_interceptions'), ('Rush Yds', 'rushing_yards')],
@@ -378,7 +378,7 @@ if os.path.exists(stpl):
                 out.append([int(r.season), int(r.week), r.team, LOGO[tname], r.opponent_team, bool(home), int(ts), int(os_)] + [num(getattr(r, c)) for c in cols])
             if out: GAMES[pid] = out
     log(f'   studio: season lines for {len(SEAS)} players, game logs for {len(GAMES)}')
-    SDATA = {'P': SP, 'S': SEAS, 'G': GAMES, 'TN': TN, 'logos': logos, 'W': {'week': WW, 'season': WS, 'lines': [{k: x[k] for k in ['name', 'pos', 'team', 'opp', 'home', 'score', 'line', 'score_key']} for x in lines]}}
+    SDATA = {'P': SP, 'S': SEAS, 'G': GAMES, 'TN': TN, 'logos': logos, 'W': {'week': WW, 'season': WS, 'lines': [{k: x[k] for k in ['id', 'name', 'pos', 'team', 'opp', 'home', 'score', 'line', 'score_key']} for x in lines]}}
     shtml = open(stpl, encoding='utf-8').read().replace('/*DATA*/null', json.dumps(SDATA, separators=(',', ':'))).replace('__SITE_URL__', SITE_URL)
     open(os.path.join(ROOT, 'studio.html'), 'w', encoding='utf-8').write(shtml)
     log(f'done: studio.html ({len(shtml) // 1024} KB)')
