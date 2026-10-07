@@ -318,7 +318,7 @@ async function drawWeek(my){
     c.font='800 14px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.65)';const res=r.score[0]>r.score[1]?'W':r.score[0]<r.score[1]?'L':'T';c.fillText(`${r.pos} · ${r.team} ${r.home?'VS':'AT'} ${r.opp} · ${res} ${r.score[0]}-${r.score[1]}`,nx,mid+26);
     const ln=r.line.join(' · ');c.fillStyle='#F2F5EF';fitText(ln,WD-60-(nx+360),Math.round(rh*.46),600,'Teko, Arial Narrow, sans-serif');c.textAlign='right';c.fillText(ln,WD-80,mid+rh*.16);c.textAlign='left'});
   footerLine(60)}
-function finishDraw(){
+function finishDraw(){setTimeout(prepShare);
   $('postBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(($('tweet').value||'')+(SITE?'\n\n'+SITE:''));
   const nm=tpl==='week'?'week-'+W.week+'-best':tpl==='vs'?(pick&&pick2?norm(pick.name).replace(/ /g,'-')+'-vs-'+norm(pick2.name).replace(/ /g,'-'):'vs'):(pick?norm(pick.name).replace(/ /g,'-'):'graphic')+'-'+(tpl==='spot'?(scope==='career'?'career':scope==='season'?$('seasonSel').value:'wk'+((spotView()||{}).g||[0,0])[1]):kind);
   try{$('dlBtn').href=cv.toDataURL('image/png');$('dlBtn').download='clocked-'+nm+'.png'}catch(e){}}
@@ -381,7 +381,20 @@ function copyImg(posting){
   try{const blob=new Promise(r=>cv.toBlob(r,'image/png'));navigator.clipboard.write([new ClipboardItem({'image/png':blob})]).then(()=>toast(posting?'Graphic copied. Paste it into your post.':'Image copied.'),()=>toast('Copy blocked. Use Download instead.'))}
   catch(e){toast('Copy blocked. Use Download instead.')}
 }
-$('copyBtn').onclick=()=>copyImg(false);$('postBtn').addEventListener('click',()=>copyImg(true));
+$('copyBtn').onclick=()=>copyImg(false);
+/* Post to X: X's web link can't carry an image. For stat graphics, use the device share sheet when it
+   supports files (iPhone, Android, Mac Safari/Chrome): picking X there opens a post with the image AND
+   text already in it. Otherwise fall back to copy-image + open the tweet. The puzzle keeps copy + open. */
+let shareFile=null;
+function prepShare(){shareFile=null;try{cv.toBlob(b=>{if(b)shareFile=new File([b],($('dlBtn').download||'clocked.png'),{type:'image/png'})},'image/png')}catch(e){}}
+$('postBtn').addEventListener('click',e=>{
+  const text=($('tweet').value||'')+(SITE?'\n\n'+SITE:'');
+  if(tpl!=='puzzle'&&shareFile&&navigator.canShare&&navigator.canShare({files:[shareFile]})){e.preventDefault();navigator.share({files:[shareFile],text}).catch(()=>{});return}
+  copyImg(true)});
+const shareOK=(()=>{try{return !!(navigator.canShare&&navigator.canShare({files:[new File([new Blob(['x'],{type:'image/png'})],'t.png',{type:'image/png'})]}))}catch(e){return false}})();
+function paintPostLabel(){const sh=shareOK&&tpl!=='puzzle';$('postBtn').querySelector('span').textContent=sh?'Share to X (with image)':'Post to X';
+  document.querySelector('.preview .note').textContent=sh?'Share opens your share sheet: pick X and the post opens with the graphic and text already attached.':'Post to X copies the image and opens the tweet. Paste the image in (Cmd/Ctrl+V, or long-press then Paste).'}
+document.querySelectorAll('#tplSeg button').forEach(b=>b.addEventListener('click',paintPostLabel));paintPostLabel();
 showFor();defaults();draw();
 </script>
 </body>
