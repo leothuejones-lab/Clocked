@@ -51,6 +51,7 @@ input:focus,textarea:focus,select:focus{outline:3px solid var(--chyron)}
 .tpl button[aria-pressed=true]{background:var(--chyron);color:var(--ink)}
 .tpl button:focus-visible{outline:3px solid var(--chyron);outline-offset:2px}
 select{padding:8px 10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--chyron);color:var(--ink);padding:9px 16px;font-weight:800;box-shadow:0 4px 0 var(--chyron-dk);max-width:calc(100vw - 32px)}
 </style>
 </head>
@@ -62,18 +63,22 @@ select{padding:8px 10px}
     <div data-for="puzzle"><div class="seg" id="srcSeg"><button data-s="player" aria-pressed="true">Any player</button><button data-s="week" aria-pressed="false">Last week line</button></div></div>
     <label class="search" for="q" data-for="puzzle spot vs"><span id="qLabel">Search</span><input id="q" type="text" placeholder="Type a name" autocomplete="off"><ul class="sugg" id="sugg" hidden></ul></label>
     <div class="picked" id="picked" data-for="puzzle spot vs">Nothing picked yet.</div>
+    <div data-for="spot puzzle"><button class="btn ghost" id="vsBtn" type="button" style="font-size:12px;padding:8px 14px"><span>VS · compare him to someone</span></button></div>
     <label class="search" for="q2" data-for="vs">Player B<input id="q2" type="text" placeholder="Type a name" autocomplete="off"><ul class="sugg" id="sugg2" hidden></ul></label>
     <div class="picked" id="picked2" data-for="vs">Nothing picked yet.</div>
+    <div class="row2" data-for="vs"><label for="vsA">A's numbers<select id="vsA"><option value="">Career</option></select></label><label for="vsB">B's numbers<select id="vsB"><option value="">Career</option></select></label></div>
     <div data-for="week"><div class="seg" id="wposSeg"><button data-p="all" aria-pressed="true">All</button><button data-p="QB" aria-pressed="false">QB</button><button data-p="RB" aria-pressed="false">RB</button><button data-p="REC" aria-pressed="false">WR/TE</button><button data-p="DEF" aria-pressed="false">Defense</button></div></div>
-    <div data-for="spot"><div class="seg" id="scopeSeg"><button data-c="career" aria-pressed="true">Career</button><button data-c="season" aria-pressed="false">Season</button><button data-c="game" aria-pressed="false">Game</button></div></div>
-    <label for="seasonSel" data-for="spot" id="seasonWrap" hidden>Season<select id="seasonSel"></select></label>
-    <label for="gameSel" data-for="spot" id="gameWrap" hidden>Game<select id="gameSel"></select></label>
+    <div data-for="puzzle spot"><div class="seg" id="scopeSeg"><button data-c="career" aria-pressed="true">Career</button><button data-c="season" aria-pressed="false">Season</button><button data-c="game" aria-pressed="false">Game</button></div></div>
+    <label for="seasonSel" data-for="puzzle spot" id="seasonWrap" hidden>Season<select id="seasonSel"></select></label>
+    <label for="gameSel" data-for="puzzle spot" id="gameWrap" hidden>Game<select id="gameSel"></select></label>
     <label for="wcount" data-for="week">How many<select id="wcount"><option>3</option><option>4</option><option selected>5</option></select></label>
     <div data-for="puzzle"><div class="seg" id="kindSeg"><button data-k="mystery" aria-pressed="true">Mystery</button><button data-k="reveal" aria-pressed="false">Reveal</button></div></div>
     <label for="headline">Headline<input id="headline" type="text"></label>
     <label for="footer">Bottom line<input id="footer" type="text"></label>
     <label for="tag">Top-right tag<input id="tag" type="text"></label>
     <div class="row" data-for="puzzle"><label><input type="checkbox" id="showLogo" checked> Team logo</label><label><input type="checkbox" id="showStats" checked> Stats</label><label><input type="checkbox" id="showPos" checked> Position</label></div>
+    <div class="row"><label><input type="checkbox" id="faces" checked> Face photos</label></div>
+    <div class="note" id="photoNote" style="margin:-6px 0 0">Headshots come from NFL.com / ESPN, which own them. Fine to look at, but posting them is your call. Wikimedia photos are free to use with the credit line that gets added.</div>
     <label for="tweet">Tweet text<textarea id="tweet"></textarea></label>
   </div>
   <div class="preview">
@@ -125,7 +130,7 @@ $('sugg').addEventListener('mousedown',e=>{const li=e.target.closest('li');if(li
 document.addEventListener('click',e=>{if(!e.target.closest('.search'))$('sugg').hidden=true});
 function choose(x){if(tpl!=='puzzle'&&src!=='player')return;pick=x;$('sugg').hidden=true;$('q').value=src==='player'?x.name:x.name;
   $('picked').textContent=src==='player'?`${x.name} · ${x.pos} · ${x.yrs[0]}–${x.active?'now':x.yrs[1]}${x.pb?` · ${x.pb}× Pro Bowl`:''}`:`${x.name} · ${x.pos} · ${x.team} ${x.home?'vs':'at'} ${OPP[x.opp]||x.opp} · ${x.line.join(', ')}`;
-  touched={headline:false,footer:false,tag:false,tweet:false};fillScope();defaults();draw()}
+  touched={headline:false,footer:false,tag:false,tweet:false};fillScope();fillVs();defaults();draw()}
 
 /* ---------- player B search (head-to-head) ---------- */
 let m2=[],s2=0;
@@ -133,7 +138,7 @@ function showSugg2(){const q=norm($('q2').value.trim()),S=$('sugg2');if(q.length
   const a=[],b=[];for(const [n,x] of PIDX){if(n.startsWith(q)||n.split(' ').some(w=>w.startsWith(q)))a.push(x);else if(n.includes(q))b.push(x)}
   a.sort((x,y)=>(y.active-x.active)||(y.pb-x.pb));m2=a.concat(b).slice(0,10);s2=0;if(!m2.length){S.hidden=true;return}
   S.innerHTML=m2.map((x,i)=>`<li data-i="${i}" aria-selected="${i===s2}"><span>${x.label}</span><small>${x.pos} · ${x.yrs[0]}${x.active?'–now':'–'+x.yrs[1]}</small></li>`).join('');S.hidden=false}
-function choose2(x){pick2=x;$('sugg2').hidden=true;$('q2').value=x.name;$('picked2').textContent=`${x.name} · ${x.pos} · ${x.yrs[0]}–${x.active?'now':x.yrs[1]}${x.pb?` · ${x.pb}× Pro Bowl`:''}`;touched.headline=touched.tweet=false;defaults();draw()}
+function choose2(x){pick2=x;setTimeout(()=>{fillVs();defaults();draw()});$('sugg2').hidden=true;$('q2').value=x.name;$('picked2').textContent=`${x.name} · ${x.pos} · ${x.yrs[0]}–${x.active?'now':x.yrs[1]}${x.pb?` · ${x.pb}× Pro Bowl`:''}`;touched.headline=touched.tweet=false;defaults();draw()}
 $('q2').addEventListener('input',showSugg2);
 $('q2').addEventListener('keydown',e=>{if($('sugg2').hidden)return;const S=$('sugg2');
   if(e.key==='ArrowDown'){s2=(s2+1)%m2.length;e.preventDefault()}else if(e.key==='ArrowUp'){s2=(s2-1+m2.length)%m2.length;e.preventDefault()}
@@ -147,6 +152,42 @@ const WPOS={QB:p=>p==='QB',RB:p=>p==='RB'||p==='FB',REC:p=>p==='WR'||p==='TE'};
 function weekRows(){const n=+$('wcount').value;return W.lines.filter(l=>wpos==='all'||(wpos==='DEF'?!['QB','RB','FB','WR','TE'].includes(l.pos):WPOS[wpos](l.pos))).sort((a,b)=>b.score_key-a.score_key).slice(0,n)}
 const WPN={all:'',QB:'QB ',RB:'RB ',REC:'WR/TE ',DEF:'DEFENSIVE '};
 
+/* ---------- face photos ----------
+   NFL.com / ESPN headshots are transparent cut-outs (great over team colors, and can be blacked out for
+   mystery cards). NFL.com uses a blank grey helmet when it has no photo, so that gets skipped. Last
+   resort is the player's Wikimedia Commons photo (a normal rectangular photo) with its credit line. */
+const PBY={};P.forEach(p=>PBY[p.id]=p);
+const photoCache={};
+async function bitmap(u){const r=await fetch(u);if(!r.ok)throw 0;return createImageBitmap(await r.blob())}
+function isBlank(bm){const cv=document.createElement('canvas');cv.width=24;cv.height=18;const x=cv.getContext('2d');x.drawImage(bm,0,0,24,18);const d=x.getImageData(0,0,24,18).data;let t=0,n=0;for(let i=0;i<d.length;i+=4){if(d[i+3]<128)continue;n++;t+=Math.max(d[i],d[i+1],d[i+2])-Math.min(d[i],d[i+1],d[i+2])}return !n||t/n<4}
+async function commonsCredit(file){try{const j=await fetch('https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=imageinfo&iiprop=extmetadata&titles=File:'+encodeURIComponent(file)).then(r=>r.json());
+  const m=Object.values(j.query.pages)[0].imageinfo[0].extmetadata,strip=h=>(h||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+  const a=strip(m.Artist&&m.Artist.value).slice(0,40),l=strip(m.LicenseShortName&&m.LicenseShortName.value);return 'Photo: '+(a?a+' · ':'')+(l||'Wikimedia Commons')+' via Wikimedia Commons'}catch(e){return 'Photo: Wikimedia Commons'}}
+function photoOf(p){
+  if(!p||!p.id)return Promise.resolve(null);
+  if(!photoCache[p.id])photoCache[p.id]=(async()=>{
+    if(p.hs){try{const bm=await bitmap(p.hs.replace(/\/f_auto,q_auto\//,'/f_png,q_auto,w_600/'));if(!isBlank(bm))return {bm,cut:true}}catch(e){}}
+    if(p.espn){try{return {bm:await bitmap(`https://a.espncdn.com/i/headshots/nfl/players/full/${p.espn}.png`),cut:true}}catch(e){}}
+    if(p.wd){const f=p.wd.split('/').pop(),u='https://upload.wikimedia.org/wikipedia/commons/thumb/'+p.wd.split('/').slice(0,2).join('/')+'/'+encodeURIComponent(f)+'/500px-'+encodeURIComponent(f);
+      try{const [bm,credit]=await Promise.all([bitmap(u),commonsCredit(f)]);return {bm,cut:false,credit}}catch(e){}}
+    return null})();
+  return photoCache[p.id]}
+function facesOn(){return $('faces').checked}
+async function faceFor(p){return facesOn()?await photoOf(p):null}
+function blackout(bm){const o=document.createElement('canvas');o.width=bm.width;o.height=bm.height;const x=o.getContext('2d');x.drawImage(bm,0,0);x.globalCompositeOperation='source-in';x.fillStyle='#101C15';x.fillRect(0,0,o.width,o.height);return o}
+/* draw a face inside a box (caller has clipped). cut-outs sit on the bottom edge; photos are cropped to fill */
+function drawFace(ph,X,Y,W,H,dark){const bm=dark&&ph.cut?blackout(ph.bm):ph.bm,bw=ph.bm.width,bh=ph.bm.height;
+  if(ph.cut){const f=H*.98/bh,w=bw*f;c.drawImage(bm,X+(W-w)/2,Y+H-bh*f,w,bh*f)}
+  else{const f=Math.max(W/bw,H/bh),w=bw*f,h=bh*f;c.drawImage(bm,X+(W-w)/2,Y+(H-h)*.22,w,h)}}
+function creditText(ph,x,y,maxW){if(!ph||ph.cut||!ph.credit)return;c.font='600 12px Archivo, Arial, sans-serif';c.fillStyle='rgba(255,255,255,.8)';let t=ph.credit;while(c.measureText(t).width>maxW&&t.length>10)t=t.slice(0,-2);c.fillText(t,x,y)}
+$('faces').addEventListener('change',draw);
+/* VS: carry the current player (and the season, if one is picked) into Head-to-head as Player A */
+$('vsBtn').onclick=()=>{if(!pick||src!=='player'){toast('Pick a player first');return}
+  const yr=scope==='season'?$('seasonSel').value:'';
+  document.querySelectorAll('#tplSeg button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.t==='vs'));tpl='vs';
+  touched={headline:false,footer:false,tag:false,tweet:false};showFor();fillVs();$('vsA').value=yr;defaults();draw();
+  $('q2').value='';$('q2').focus();toast('Now pick who to compare him to')};
+
 /* ---------- Spotlight scope: career / one season / one game ---------- */
 const SEAS=DATA.S||{},GAMES=DATA.G||{},TNAMES=DATA.TN||[];
 const seasonsOf=p=>p&&p.id?(SEAS[p.id]||[]):[];
@@ -156,7 +197,13 @@ function fillScope(){
   $('seasonSel').innerHTML=ss.slice().reverse().map(r=>`<option value="${r[0]}">${r[0]} · ${TNAMES[r[1]]}${r[4]>1?' +'+(r[4]-1):''}</option>`).join('')||'<option value="">No game logs (before 1999)</option>';
   $('gameSel').innerHTML=gg.slice().reverse().map((g,i)=>`<option value="${gg.length-1-i}">${g[0]} Wk ${g[1]} · ${g[5]?'vs':'at'} ${g[4]} · ${g[6]>g[7]?'W':g[6]<g[7]?'L':'T'} ${g[6]}-${g[7]}</option>`).join('')||'<option value="">No games this season or last</option>';
   paintScope()}
-function paintScope(){$('seasonWrap').hidden=tpl!=='spot'||scope!=='season';$('gameWrap').hidden=tpl!=='spot'||scope!=='game'}
+function seasonOpts(p){return '<option value="">Career</option>'+seasonsOf(p).slice().reverse().map(r=>`<option value="${r[0]}">${r[0]} season · ${TNAMES[r[1]]}</option>`).join('')}
+function fillVs(){$('vsA').innerHTML=seasonOpts(pick);$('vsB').innerHTML=seasonOpts(pick2)}
+['vsA','vsB'].forEach(id=>$(id).addEventListener('change',()=>{touched.tweet=touched.tag=false;defaults();draw()}));
+function vsView(p,yr){if(!yr)return {logo:p.logo,sub:`${p.pos} · ${yrs(p)}`,stats:p.stats,career:true,label:p.name};const r=seasonsOf(p).find(r=>String(r[0])===yr);
+  return {logo:r[2],sub:`${r[0]} · ${TNAMES[r[1]]}`,stats:p.stats.map((s,i)=>[s[0],r[5+i]]),career:false,label:r[0]+' '+p.name}}
+function scoped(){return tpl==='spot'||(tpl==='puzzle'&&src==='player')}
+function paintScope(){$('seasonWrap').hidden=!scoped()||scope!=='season';$('gameWrap').hidden=!scoped()||scope!=='game';const sg=$('scopeSeg');if(sg)sg.parentElement.hidden=!scoped()}
 /* what the Spotlight card shows: {logo, sub line, stats, honors?} */
 function spotView(){
   const p=pick,labels=p.stats.map(s=>s[0]);
@@ -173,7 +220,7 @@ function defaults(){
     set('tag',v&&v.kicker?v.kicker:pick&&pick.hof?'HALL OF FAME':'BY THE NUMBERS');
     set('tweet',!pick?'':scope==='season'&&v?`${pick.name}${/s$/.test(pick.name)?"'":"'s"} ${v.yr} season 📊\nWhere does it rank? 👇`:scope==='game'&&v?`${pick.name} in Week ${v.g[1]} ${v.g[5]?'vs':'at'} ${OPP[v.g[4]]||v.g[4]} 🔥\nRate it 1-10 👇`:`${pick.name}, by the numbers 📊\nUnderrated or overrated? 👇`);return}
   if(tpl==='vs'){set('headline','WHO YA GOT?');set('footer','Play daily at '+siteShort);set('tag','HEAD TO HEAD');
-    set('tweet',pick&&pick2?`${pick.name} or ${pick2.name}? 🤔\nWho ya got? 👇`:'Who ya got? 👇');return}
+    set('tweet',pick&&pick2?`${vsView(pick,$('vsA').value).label} or ${vsView(pick2,$('vsB').value).label}? 🤔\nWho ya got? 👇`:'Who ya got? 👇');return}
   if(tpl==='week'){set('headline',`WEEK ${W.week}'S BEST ${WPN[wpos]}LINES`);set('footer','Play daily at '+siteShort);set('tag','WEEK '+W.week+' · '+W.season);
     set('tweet',`Best ${WPN[wpos].toLowerCase()}lines of Week ${W.week} 🔥\nWho'd we miss? 👇`);return}
   if(kind==='mystery'){set('headline','WHO IS THIS?');set('footer','Reply with your guess');}
@@ -187,7 +234,7 @@ function defaults(){
 ['headline','footer','tag','tweet'].forEach(id=>$(id).addEventListener('input',()=>{touched[id]=true;draw()}));
 ['showLogo','showStats','showPos'].forEach(id=>$(id).addEventListener('change',draw));
 function segs(id,attr,fn){document.querySelectorAll('#'+id+' button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#'+id+' button').forEach(x=>x.setAttribute('aria-pressed',x===b));fn(b.dataset[attr])})}
-segs('srcSeg','s',v=>{src=v;pick=null;$('q').value='';$('picked').textContent='Nothing picked yet.';$('q').placeholder=v==='week'?'Filter by name or team':'Type a name';touched={headline:false,footer:false,tag:false,tweet:false};defaults();draw();if(v==='week'){$('q').focus();showSugg()}});
+segs('srcSeg','s',v=>{src=v;setTimeout(paintScope);pick=null;$('q').value='';$('picked').textContent='Nothing picked yet.';$('q').placeholder=v==='week'?'Filter by name or team':'Type a name';touched={headline:false,footer:false,tag:false,tweet:false};defaults();draw();if(v==='week'){$('q').focus();showSugg()}});
 segs('kindSeg','k',v=>{kind=v;touched.headline=touched.footer=touched.tweet=false;defaults();draw()});
 segs('tplSeg','t',v=>{tpl=v;if(v!=='puzzle'&&src!=='player'){src='player';pick=null;$('q').value='';$('picked').textContent='Nothing picked yet.';document.querySelectorAll('#srcSeg button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.s==='player'))}
   touched={headline:false,footer:false,tag:false,tweet:false};showFor();defaults();draw()});
@@ -220,10 +267,11 @@ function badges(list,x,y,maxX){c.font='600 30px Teko, Arial Narrow, sans-serif';
 function footerLine(x,align){c.font='600 26px Archivo, Arial, sans-serif';c.fillStyle='#FFD23F';c.textAlign=align||'left';c.fillText($('footer').value||'',x,HT-48);c.textAlign='left'}
 function emptyMsg(t){c.font='600 40px Teko, Arial Narrow, sans-serif';c.fillStyle='rgba(242,245,239,.6)';c.textAlign='center';c.fillText(t,WD/2,HT/2+20);c.textAlign='left'}
 async function drawSpot(my){
-  const v=pick?spotView():null,lg=v?LOGOS[v.logo]:null,li=lg?await img(lg.img):null;if(my!==drawing)return;header();
+  const v=pick?spotView():null,lg=v?LOGOS[v.logo]:null,li=lg?await img(lg.img):null,ph=pick?await faceFor(pick):null;if(my!==drawing)return;header();
   if(!pick){emptyMsg('Search a player to build a spotlight');return}
   if(!v){emptyMsg(scope==='season'?'No season logs for him (game logs start in 1999)':'No games for him this season or last');return}
-  const X=60,Y=170,CW=420,CH=440;stripes(X,Y,CW,CH,lg.c1);logoTile(li,X+(CW-220)/2,Y+70,220);
+  const X=60,Y=170,CW=420,CH=440;stripes(X,Y,CW,CH,lg.c1);
+  if(ph){c.save();rr(X,Y,CW,CH,22);c.clip();drawFace(ph,X,Y,CW,CH,false);c.restore();logoTile(li,X+CW-96,Y+16,80);creditText(ph,X+14,Y+CH-14,CW-150)}else logoTile(li,X+(CW-220)/2,Y+70,220);
   c.font='700 64px Teko, Arial Narrow, sans-serif';const pw=c.measureText(pick.pos).width+36;slab(X+CW-pw-30,Y+CH-92,10,70,lg.c2);slab(X+CW-pw-22,Y+CH-92,pw,70,'#fff');c.fillStyle='#101C15';c.fillText(pick.pos,X+CW-pw-22+24,Y+CH-36);
   const RX=530,RW=WD-RX-60;const hl=($('headline').value||'').toUpperCase();
   const fs=fitText(hl,RW,96,700,'Teko, Arial Narrow, sans-serif');c.fillStyle='#F2F5EF';c.fillText(hl,RX,170+fs*.78);
@@ -233,19 +281,23 @@ async function drawSpot(my){
     c.font='800 17px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.7)';c.fillText(s[0].toUpperCase(),x,y+78)});
   if(v.honors)badges(honors(pick),RX,HT-128,WD-60);else{c.font='800 16px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.55)';c.fillText('REGULAR SEASON',RX,HT-100)}footerLine(RX)}
 async function drawVs(my){
-  const la=pick?LOGOS[pick.logo]:null,lb=pick2?LOGOS[pick2.logo]:null,ia=la?await img(la.img):null,ib=lb?await img(lb.img):null;if(my!==drawing)return;header();
+  const va=pick?vsView(pick,$('vsA').value):null,vb=pick2?vsView(pick2,$('vsB').value):null,la=va?LOGOS[va.logo]:null,lb=vb?LOGOS[vb.logo]:null,ia=la?await img(la.img):null,ib=lb?await img(lb.img):null;
+  const fa=pick?await faceFor(pick):null,fb=pick2?await faceFor(pick2):null;if(my!==drawing)return;header();
   const hl=($('headline').value||'').toUpperCase();c.fillStyle='#F2F5EF';const fs=fitText(hl,WD-560,64,700,'Teko, Arial Narrow, sans-serif');c.textAlign='center';c.fillText(hl,WD/2,96+fs*.36);c.textAlign='left';
   if(!pick||!pick2){emptyMsg(!pick?'Pick player A':'Pick player B');return}
-  const side=(p,lg,li,x)=>{stripes(x,166,500,116,lg.c1);logoTile(li,x+18,180,88);c.fillStyle='#fff';const nm=p.name.toUpperCase();fitText(nm,360,54,700,'Teko, Arial Narrow, sans-serif');c.fillText(nm,x+122,232);
-    c.font='800 17px Archivo, Arial, sans-serif';c.fillStyle='rgba(255,255,255,.85)';c.fillText(`${p.pos} · ${yrs(p)}`.toUpperCase(),x+122,264)};
-  side(pick,la,ia,60);side(pick2,lb,ib,640);
+  const side=(p,v,lg,li,ph,x)=>{stripes(x,166,500,116,lg.c1);let tx=x+122;
+    if(ph){c.save();rr(x,166,500,116,22);c.clip();drawFace(ph,x+4,166,ph.cut?150:120,116,false);c.restore();logoTile(li,x+500-62,178,46);tx=x+(ph.cut?150:132)}else logoTile(li,x+18,180,88);
+    c.fillStyle='#fff';const nm=p.name.toUpperCase();fitText(nm,x+500-(ph?72:20)-tx,54,700,'Teko, Arial Narrow, sans-serif');c.fillText(nm,tx,232);
+    c.font='800 17px Archivo, Arial, sans-serif';c.fillStyle='rgba(255,255,255,.85)';c.fillText(v.sub.toUpperCase(),tx,264)};
+  side(pick,va,la,ia,fa,60);side(pick2,vb,lb,ib,fb,640);
+  const cr=[fa,fb].filter(f=>f&&!f.cut&&f.credit).map(f=>f.credit.replace(/^Photo: /,'')).join(' / ');if(cr){c.font='600 11px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.55)';c.textAlign='center';c.fillText(('Photos: '+cr).slice(0,170),WD/2,HT-14);c.textAlign='left'}
   c.save();c.translate(600,224);slab(-38,-30,76,60,'#FFD23F');c.restore();c.font='700 46px Teko, Arial Narrow, sans-serif';c.fillStyle='#101C15';c.textAlign='center';c.fillText('VS',600-4,241);c.textAlign='left';
-  const A=pick.stats,B=pick2.stats,same=A.length===B.length&&A.every((s,i)=>s[0]===B[i][0]),rows=[];
+  const A=va.stats,B=vb.stats,same=A.length===B.length&&A.every((s,i)=>s[0]===B[i][0]),rows=[];
   const lowerBetter=(lab)=>pick.pos==='QB'&&pick2.pos==='QB'&&lab==='INT';
   if(same)A.forEach((s,i)=>{const a=s[1],b=B[i][1],lb2=lowerBetter(s[0]);rows.push({lab:s[0],l:fmt(a),r:fmt(b),win:a===b?null:((a>b)!==lb2?'l':'r')})});
   else for(let i=0;i<Math.max(A.length,B.length);i++)rows.push({lab:'',l:A[i]?fmt(A[i][1])+' '+A[i][0]:'',r:B[i]?fmt(B[i][1])+' '+B[i][0]:'',win:null});
-  rows.push({lab:'Pro Bowls',l:String(pick.pb),r:String(pick2.pb),win:pick.pb===pick2.pb?null:pick.pb>pick2.pb?'l':'r'});
-  if(pick.ap||pick2.ap)rows.push({lab:'1st-team All-Pro',l:String(pick.ap),r:String(pick2.ap),win:pick.ap===pick2.ap?null:pick.ap>pick2.ap?'l':'r'});
+  if(va.career&&vb.career)rows.push({lab:'Pro Bowls',l:String(pick.pb),r:String(pick2.pb),win:pick.pb===pick2.pb?null:pick.pb>pick2.pb?'l':'r'});
+  if(va.career&&vb.career&&(pick.ap||pick2.ap))rows.push({lab:'1st-team All-Pro',l:String(pick.ap),r:String(pick2.ap),win:pick.ap===pick2.ap?null:pick.ap>pick2.ap?'l':'r'});
   const step=Math.min(62,(HT-96-306)/rows.length),top=306+step*.78;
   rows.forEach((r,i)=>{const y=top+i*step;if(i%2===0){c.fillStyle='rgba(255,255,255,.04)';c.fillRect(60,y-step*.72,WD-120,step)}
     c.font='800 17px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.7)';c.textAlign='center';c.fillText(r.lab.toUpperCase(),WD/2,y-step*.22);
@@ -254,14 +306,15 @@ async function drawVs(my){
     c.textAlign='left';c.fillStyle=r.win==='r'?'#FFD23F':r.win==='l'?'rgba(242,245,239,.55)':'#F2F5EF';c.fillText(r.r,WD/2+150,y)});
   c.textAlign='left';footerLine(WD/2,'center')}
 async function drawWeek(my){
-  const rows=weekRows(),lis=await Promise.all(rows.map(r=>LOGOS[r.team]?img(LOGOS[r.team].img):null));if(my!==drawing)return;header();
+  const rows=weekRows(),lis=await Promise.all(rows.map(r=>LOGOS[r.team]?img(LOGOS[r.team].img):null)),phs=await Promise.all(rows.map(r=>faceFor(PBY[r.id])));if(my!==drawing)return;header();
   const hl=($('headline').value||'').toUpperCase();c.fillStyle='#F2F5EF';const fs=fitText(hl,WD-120,76,700,'Teko, Arial Narrow, sans-serif');c.fillText(hl,60,150+fs*.75);
   if(!rows.length){emptyMsg('No lines for that position this week');return}
   const top=236,avail=HT-100-top,rh=Math.min(84,avail/rows.length);
   rows.forEach((r,i)=>{const y=top+i*rh;if(i%2===0){c.fillStyle='rgba(255,255,255,.05)';c.fillRect(60,y,WD-120,rh-6)}
     const mid=y+(rh-6)/2;c.font=`700 ${Math.round(rh*.62)}px Teko, Arial Narrow, sans-serif`;c.fillStyle='#FFD23F';c.textAlign='center';c.fillText(String(i+1),104,mid+rh*.22);c.textAlign='left';
-    const S=Math.round(rh*.62);logoTile(lis[i],140,mid-S/2,S);
-    const nx=140+S+18;c.fillStyle='#F2F5EF';fitText(r.name.toUpperCase(),330,Math.round(rh*.5),700,'Teko, Arial Narrow, sans-serif');c.fillText(r.name.toUpperCase(),nx,mid+4);
+    const S=Math.round(rh*.62),ph=phs[i];
+    if(ph&&ph.cut){const D=Math.round(rh*.8);c.save();c.beginPath();c.arc(140+D/2,mid,D/2,0,Math.PI*2);c.fillStyle=(LOGOS[r.team]||{}).c1||'#333';c.fill();c.clip();drawFace(ph,140-D*.2,mid-D/2,D*1.4,D,false);c.restore();logoTile(lis[i],140+D-22,mid+D/2-24,26)}else logoTile(lis[i],140,mid-S/2,S);
+    const nx=140+(ph&&ph.cut?Math.round(rh*.8):S)+18;c.fillStyle='#F2F5EF';fitText(r.name.toUpperCase(),330,Math.round(rh*.5),700,'Teko, Arial Narrow, sans-serif');c.fillText(r.name.toUpperCase(),nx,mid+4);
     c.font='800 14px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.65)';const res=r.score[0]>r.score[1]?'W':r.score[0]<r.score[1]?'L':'T';c.fillText(`${r.pos} · ${r.team} ${r.home?'VS':'AT'} ${r.opp} · ${res} ${r.score[0]}-${r.score[1]}`,nx,mid+26);
     const ln=r.line.join(' · ');c.fillStyle='#F2F5EF';fitText(ln,WD-60-(nx+360),Math.round(rh*.46),600,'Teko, Arial Narrow, sans-serif');c.textAlign='right';c.fillText(ln,WD-80,mid+rh*.16);c.textAlign='left'});
   footerLine(60)}
@@ -273,8 +326,10 @@ async function draw(){
   const my=++drawing;
   try{await Promise.all(['700 96px Teko','600 40px Teko','800 24px Archivo','600 24px Archivo'].map(f=>document.fonts.load(f)))}catch(e){}
   if(tpl!=='puzzle'){await (tpl==='spot'?drawSpot:tpl==='vs'?drawVs:drawWeek)(my);if(my===drawing)finishDraw();return}
-  const lg=pick?LOGOS[pick.logo||pick.team]:null;
+  const pv=pick&&src==='player'?spotView():null;
+  const lg=pick?LOGOS[pv?pv.logo:(pick.logo||pick.team)]:null;
   const li=lg&&$('showLogo').checked?await img(lg.img):null;
+  const ph=pick?await faceFor(src==='player'?pick:PBY[pick.id]):null;
   if(my!==drawing)return;
   c.clearRect(0,0,WD,HT);
   c.fillStyle='#0C3A25';c.fillRect(0,0,WD,HT);c.fillStyle='rgba(255,255,255,.03)';for(let x=0;x<WD;x+=128)c.fillRect(x,0,64,HT);
@@ -287,9 +342,12 @@ async function draw(){
   c.save();rr(X,Y,CW,CH,26);c.clip();c.fillStyle=c1;c.fillRect(X,Y,CW,CH);
   const gr=c.createLinearGradient(0,Y,0,Y+CH);gr.addColorStop(0,'rgba(255,255,255,.16)');gr.addColorStop(1,'rgba(0,0,0,.2)');c.fillStyle=gr;c.fillRect(X,Y,CW,CH);
   c.strokeStyle='rgba(255,255,255,.06)';c.lineWidth=2;for(let i=-CH;i<CW;i+=18){c.beginPath();c.moveTo(X+i,Y+CH);c.lineTo(X+i+CH*.47,Y);c.stroke()}
-  const sc=CH*.94/200;c.save();c.translate(X+CW/2-100*sc,Y+CH-200*sc);c.scale(sc,sc);c.fillStyle='#101C15';
-  c.beginPath();c.ellipse(100,72,34,41,0,0,Math.PI*2);c.fill();c.fill(new Path2D('M100 120c-14 0-26-4-33-10l-6 10c-28 6-48 20-55 40l-4 40h196l-4-40c-7-20-27-34-55-40l-6-10c-7 6-19 10-33 10z'));c.restore();
-  if(kind==='mystery'){c.font='700 120px Teko, Arial Narrow, sans-serif';c.fillStyle='rgba(255,255,255,.92)';c.textAlign='center';c.fillText('?',X+CW/2,Y+CH*.5);c.textAlign='left'}
+  const showPh=ph&&(kind==='reveal'||ph.cut);
+  if(showPh)drawFace(ph,X,Y,CW,CH,kind==='mystery');
+  else{const sc=CH*.94/200;c.save();c.translate(X+CW/2-100*sc,Y+CH-200*sc);c.scale(sc,sc);c.fillStyle='#101C15';
+  c.beginPath();c.ellipse(100,72,34,41,0,0,Math.PI*2);c.fill();c.fill(new Path2D('M100 120c-14 0-26-4-33-10l-6 10c-28 6-48 20-55 40l-4 40h196l-4-40c-7-20-27-34-55-40l-6-10c-7 6-19 10-33 10z'));c.restore()}
+  if(kind==='reveal'&&showPh)creditText(ph,X+16,Y+22,CW-160);
+  if(kind==='mystery'){c.font='700 120px Teko, Arial Narrow, sans-serif';c.fillStyle='rgba(255,255,255,.92)';c.textAlign='center';c.fillText('?',X+CW/2,showPh?Y+CH*.42:Y+CH*.5);c.textAlign='left'}
   else if(pick){ // name plate + stamp
     let fs=58;const nm=pick.name.toUpperCase();c.font=`700 ${fs}px Teko`;while(c.measureText(nm).width>CW*.62&&fs>30){fs-=2;c.font=`700 ${fs}px Teko`}
     const nw=c.measureText(nm).width+44;c.fillStyle='#fff';c.fillRect(X,Y+CH-100,nw,72);c.fillStyle='#FFD23F';c.fillRect(X,Y+CH-100,9,72);c.fillStyle='#101C15';c.fillText(nm,X+24,Y+CH-64+fs*.36);
@@ -302,14 +360,14 @@ async function draw(){
   const RX=730,RW=WD-RX-50;c.fillStyle='#F2F5EF';
   const hl=($('headline').value||'').toUpperCase();
   const showSt=!!(pick&&$('showStats').checked);
-  const items=showSt?(src==='week'?pick.line:pick.stats.map(s=>fmt(s[1])+' '+s[0])).slice(0,5):[];
+  const items=showSt?(src==='week'?pick.line:(pv?pv.stats:pick.stats).map(s=>fmt(s[1])+' '+s[0])).slice(0,5):[];
   c.font='600 44px Teko, Arial Narrow, sans-serif';let rows=items.length?1:0,rx=RX;items.forEach(t=>{const w=c.measureText(t).width;if(rx+w>WD-50){rows++;rx=RX}rx+=w+24});
   const statsH=showSt?40+46+(rows-1)*48+10:0, bottom=HT-110;
   let fs=92,lines;for(;;){c.font=`700 ${fs}px Teko`;lines=wrap(hl,RW);const end=190+fs*.8+(lines.length-1)*fs*.86+statsH;if((end<=bottom&&lines.every(l=>c.measureText(l).width<=RW))||fs<=36)break;fs-=4}
   c.fillStyle='#F2F5EF';let y=190+fs*.8;lines.forEach(l=>{c.fillText(l,RX,y);y+=fs*.86});y-=fs*.86;
   if(showSt){
     y+=40;c.font='800 18px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.7)';
-    c.fillText(src==='week'?`WEEK ${W.week} · ${pick.home?'VS':'AT'} ${(OPP[pick.opp]||pick.opp).toUpperCase()} · ${pick.score[0]>pick.score[1]?'W':pick.score[0]<pick.score[1]?'L':'T'} ${pick.score[0]}-${pick.score[1]}`:(pick.active?'CAREER · ACTIVE':'CAREER · '+pick.yrs[0]+'-'+pick.yrs[1]),RX,y);y+=46;
+    c.fillText(src==='week'?`WEEK ${W.week} · ${pick.home?'VS':'AT'} ${(OPP[pick.opp]||pick.opp).toUpperCase()} · ${pick.score[0]>pick.score[1]?'W':pick.score[0]<pick.score[1]?'L':'T'} ${pick.score[0]}-${pick.score[1]}`:(pv&&pv.kicker?pv.kicker+(scope==='game'?' · '+pv.sub.split(' · ').slice(1).join(' · '):''):pick.active?'CAREER · ACTIVE':'CAREER · '+pick.yrs[0]+'-'+pick.yrs[1]),RX,y);y+=46;
     c.fillStyle='#F2F5EF';c.font='600 44px Teko, Arial Narrow, sans-serif';
     let lx=RX;items.forEach(t=>{const w=c.measureText(t).width;if(lx+w>WD-50){lx=RX;y+=48}c.fillText(t,lx,y);lx+=w+24});
   }
