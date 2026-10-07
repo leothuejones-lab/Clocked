@@ -65,6 +65,9 @@ select{padding:8px 10px}
     <label class="search" for="q2" data-for="vs">Player B<input id="q2" type="text" placeholder="Type a name" autocomplete="off"><ul class="sugg" id="sugg2" hidden></ul></label>
     <div class="picked" id="picked2" data-for="vs">Nothing picked yet.</div>
     <div data-for="week"><div class="seg" id="wposSeg"><button data-p="all" aria-pressed="true">All</button><button data-p="QB" aria-pressed="false">QB</button><button data-p="RB" aria-pressed="false">RB</button><button data-p="REC" aria-pressed="false">WR/TE</button><button data-p="DEF" aria-pressed="false">Defense</button></div></div>
+    <div data-for="spot"><div class="seg" id="scopeSeg"><button data-c="career" aria-pressed="true">Career</button><button data-c="season" aria-pressed="false">Season</button><button data-c="game" aria-pressed="false">Game</button></div></div>
+    <label for="seasonSel" data-for="spot" id="seasonWrap" hidden>Season<select id="seasonSel"></select></label>
+    <label for="gameSel" data-for="spot" id="gameWrap" hidden>Game<select id="gameSel"></select></label>
     <label for="wcount" data-for="week">How many<select id="wcount"><option>3</option><option>4</option><option selected>5</option></select></label>
     <div data-for="puzzle"><div class="seg" id="kindSeg"><button data-k="mystery" aria-pressed="true">Mystery</button><button data-k="reveal" aria-pressed="false">Reveal</button></div></div>
     <label for="headline">Headline<input id="headline" type="text"></label>
@@ -92,7 +95,7 @@ const LOGOS=DATA.logos, P=DATA.P, W=DATA.W;
 const fmt=n=>typeof n==='number'?(Number.isInteger(n)?n.toLocaleString('en-US'):n.toFixed(1)):n;
 const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'');
 const OPP={ARI:'Arizona',ATL:'Atlanta',BAL:'Baltimore',BUF:'Buffalo',CAR:'Carolina',CHI:'Chicago',CIN:'Cincinnati',CLE:'Cleveland',DAL:'Dallas',DEN:'Denver',DET:'Detroit',GB:'Green Bay',HOU:'Houston',IND:'Indianapolis',JAX:'Jacksonville',KC:'Kansas City',LA:'LA Rams',LAC:'LA Chargers',LV:'Las Vegas',MIA:'Miami',MIN:'Minnesota',NE:'New England',NO:'New Orleans',NYG:'NY Giants',NYJ:'NY Jets',PHI:'Philadelphia',PIT:'Pittsburgh',SEA:'Seattle',SF:'San Francisco',TB:'Tampa Bay',TEN:'Tennessee',WAS:'Washington'};
-let tpl='puzzle',wpos='all',pick2=null,src='player',kind='mystery',pick=null,touched={headline:false,footer:false,tag:false,tweet:false};
+let scope='career',tpl='puzzle',wpos='all',pick2=null,src='player',kind='mystery',pick=null,touched={headline:false,footer:false,tag:false,tweet:false};
 const siteShort=(SITE||'Clocked').replace(/^https?:\/\//,'');
 
 /* ---------- search ---------- */
@@ -122,7 +125,7 @@ $('sugg').addEventListener('mousedown',e=>{const li=e.target.closest('li');if(li
 document.addEventListener('click',e=>{if(!e.target.closest('.search'))$('sugg').hidden=true});
 function choose(x){if(tpl!=='puzzle'&&src!=='player')return;pick=x;$('sugg').hidden=true;$('q').value=src==='player'?x.name:x.name;
   $('picked').textContent=src==='player'?`${x.name} · ${x.pos} · ${x.yrs[0]}–${x.active?'now':x.yrs[1]}${x.pb?` · ${x.pb}× Pro Bowl`:''}`:`${x.name} · ${x.pos} · ${x.team} ${x.home?'vs':'at'} ${OPP[x.opp]||x.opp} · ${x.line.join(', ')}`;
-  touched={headline:false,footer:false,tag:false,tweet:false};defaults();draw()}
+  touched={headline:false,footer:false,tag:false,tweet:false};fillScope();defaults();draw()}
 
 /* ---------- player B search (head-to-head) ---------- */
 let m2=[],s2=0;
@@ -139,16 +142,36 @@ $('q2').addEventListener('keydown',e=>{if($('sugg2').hidden)return;const S=$('su
 $('sugg2').addEventListener('mousedown',e=>{const li=e.target.closest('li');if(li){e.preventDefault();choose2(m2[+li.dataset.i])}});
 document.addEventListener('click',e=>{if(!e.target.closest('.search'))$('sugg2').hidden=true});
 $('wkN').textContent=W.week;
-function showFor(){document.querySelectorAll('[data-for]').forEach(el=>el.hidden=!el.dataset.for.split(' ').includes(tpl));$('qLabel').textContent=tpl==='vs'?'Player A':'Search'}
+function showFor(){document.querySelectorAll('[data-for]').forEach(el=>el.hidden=!el.dataset.for.split(' ').includes(tpl));paintScope();$('qLabel').textContent=tpl==='vs'?'Player A':'Search'}
 const WPOS={QB:p=>p==='QB',RB:p=>p==='RB'||p==='FB',REC:p=>p==='WR'||p==='TE'};
 function weekRows(){const n=+$('wcount').value;return W.lines.filter(l=>wpos==='all'||(wpos==='DEF'?!['QB','RB','FB','WR','TE'].includes(l.pos):WPOS[wpos](l.pos))).sort((a,b)=>b.score_key-a.score_key).slice(0,n)}
 const WPN={all:'',QB:'QB ',RB:'RB ',REC:'WR/TE ',DEF:'DEFENSIVE '};
 
+/* ---------- Spotlight scope: career / one season / one game ---------- */
+const SEAS=DATA.S||{},GAMES=DATA.G||{},TNAMES=DATA.TN||[];
+const seasonsOf=p=>p&&p.id?(SEAS[p.id]||[]):[];
+const gamesOf=p=>p&&p.id?(GAMES[p.id]||[]):[];
+function fillScope(){
+  const ss=seasonsOf(pick),gg=gamesOf(pick);
+  $('seasonSel').innerHTML=ss.slice().reverse().map(r=>`<option value="${r[0]}">${r[0]} · ${TNAMES[r[1]]}${r[4]>1?' +'+(r[4]-1):''}</option>`).join('')||'<option value="">No game logs (before 1999)</option>';
+  $('gameSel').innerHTML=gg.slice().reverse().map((g,i)=>`<option value="${gg.length-1-i}">${g[0]} Wk ${g[1]} · ${g[5]?'vs':'at'} ${g[4]} · ${g[6]>g[7]?'W':g[6]<g[7]?'L':'T'} ${g[6]}-${g[7]}</option>`).join('')||'<option value="">No games this season or last</option>';
+  paintScope()}
+function paintScope(){$('seasonWrap').hidden=tpl!=='spot'||scope!=='season';$('gameWrap').hidden=tpl!=='spot'||scope!=='game'}
+/* what the Spotlight card shows: {logo, sub line, stats, honors?} */
+function spotView(){
+  const p=pick,labels=p.stats.map(s=>s[0]);
+  if(scope==='season'){const r=seasonsOf(p).find(r=>String(r[0])===$('seasonSel').value);if(!r)return null;
+    return {logo:r[2],kicker:`${r[0]} SEASON`,sub:`${p.pos} · ${TNAMES[r[1]]}${r[4]>1?' (+'+(r[4]-1)+' more team)':''}`,stats:labels.map((l,i)=>[l,r[5+i]]),honors:false,yr:r[0]}}
+  if(scope==='game'){const g=gamesOf(p)[+$('gameSel').value];if(!g)return null;const res=g[6]>g[7]?'W':g[6]<g[7]?'L':'T';
+    return {logo:g[3],kicker:`WEEK ${g[1]} · ${g[0]}`,sub:`${p.pos} · ${g[2]} ${g[5]?'VS':'AT'} ${g[4]} · ${res} ${g[6]}-${g[7]}`,stats:labels.map((l,i)=>[l,g[8+i]]),honors:false,g}}
+  return {logo:p.logo,kicker:null,sub:`${p.pos} · ${yrs(p)} · ${fmt(p.games)} GAMES${p.active?' · ACTIVE':''}`,stats:p.stats,honors:true}}
+
 /* ---------- defaults ---------- */
 function defaults(){
   const set=(id,v)=>{if(!touched[id])$(id).value=v};
-  if(tpl==='spot'){set('headline',pick?pick.name.toUpperCase():'PLAYER SPOTLIGHT');set('footer','Play daily at '+siteShort);set('tag',pick&&pick.hof?'HALL OF FAME':'BY THE NUMBERS');
-    set('tweet',pick?`${pick.name}, by the numbers 📊\nUnderrated or overrated? 👇`:'');return}
+  if(tpl==='spot'){const v=pick?spotView():null;set('headline',pick?pick.name.toUpperCase():'PLAYER SPOTLIGHT');set('footer','Play daily at '+siteShort);
+    set('tag',v&&v.kicker?v.kicker:pick&&pick.hof?'HALL OF FAME':'BY THE NUMBERS');
+    set('tweet',!pick?'':scope==='season'&&v?`${pick.name}${/s$/.test(pick.name)?"'":"'s"} ${v.yr} season 📊\nWhere does it rank? 👇`:scope==='game'&&v?`${pick.name} in Week ${v.g[1]} ${v.g[5]?'vs':'at'} ${OPP[v.g[4]]||v.g[4]} 🔥\nRate it 1-10 👇`:`${pick.name}, by the numbers 📊\nUnderrated or overrated? 👇`);return}
   if(tpl==='vs'){set('headline','WHO YA GOT?');set('footer','Play daily at '+siteShort);set('tag','HEAD TO HEAD');
     set('tweet',pick&&pick2?`${pick.name} or ${pick2.name}? 🤔\nWho ya got? 👇`:'Who ya got? 👇');return}
   if(tpl==='week'){set('headline',`WEEK ${W.week}'S BEST ${WPN[wpos]}LINES`);set('footer','Play daily at '+siteShort);set('tag','WEEK '+W.week+' · '+W.season);
@@ -170,6 +193,8 @@ segs('tplSeg','t',v=>{tpl=v;if(v!=='puzzle'&&src!=='player'){src='player';pick=n
   touched={headline:false,footer:false,tag:false,tweet:false};showFor();defaults();draw()});
 segs('wposSeg','p',v=>{wpos=v;touched.headline=touched.tweet=false;defaults();draw()});
 $('wcount').addEventListener('change',draw);
+segs('scopeSeg','c',v=>{scope=v;paintScope();touched.tag=touched.tweet=false;defaults();draw()});
+['seasonSel','gameSel'].forEach(id=>$(id).addEventListener('change',()=>{touched.tag=touched.tweet=false;defaults();draw()}));
 
 /* ---------- drawing ---------- */
 const cv=$('cv'),c=cv.getContext('2d'),WD=1200,HT=675;
@@ -195,17 +220,18 @@ function badges(list,x,y,maxX){c.font='600 30px Teko, Arial Narrow, sans-serif';
 function footerLine(x,align){c.font='600 26px Archivo, Arial, sans-serif';c.fillStyle='#FFD23F';c.textAlign=align||'left';c.fillText($('footer').value||'',x,HT-48);c.textAlign='left'}
 function emptyMsg(t){c.font='600 40px Teko, Arial Narrow, sans-serif';c.fillStyle='rgba(242,245,239,.6)';c.textAlign='center';c.fillText(t,WD/2,HT/2+20);c.textAlign='left'}
 async function drawSpot(my){
-  const lg=pick?LOGOS[pick.logo]:null,li=lg?await img(lg.img):null;if(my!==drawing)return;header();
+  const v=pick?spotView():null,lg=v?LOGOS[v.logo]:null,li=lg?await img(lg.img):null;if(my!==drawing)return;header();
   if(!pick){emptyMsg('Search a player to build a spotlight');return}
+  if(!v){emptyMsg(scope==='season'?'No season logs for him (game logs start in 1999)':'No games for him this season or last');return}
   const X=60,Y=170,CW=420,CH=440;stripes(X,Y,CW,CH,lg.c1);logoTile(li,X+(CW-220)/2,Y+70,220);
   c.font='700 64px Teko, Arial Narrow, sans-serif';const pw=c.measureText(pick.pos).width+36;slab(X+CW-pw-30,Y+CH-92,10,70,lg.c2);slab(X+CW-pw-22,Y+CH-92,pw,70,'#fff');c.fillStyle='#101C15';c.fillText(pick.pos,X+CW-pw-22+24,Y+CH-36);
   const RX=530,RW=WD-RX-60;const hl=($('headline').value||'').toUpperCase();
   const fs=fitText(hl,RW,96,700,'Teko, Arial Narrow, sans-serif');c.fillStyle='#F2F5EF';c.fillText(hl,RX,170+fs*.78);
-  c.font='800 20px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.72)';c.fillText(`${pick.pos} · ${yrs(pick)} · ${fmt(pick.games)} GAMES${pick.active?' · ACTIVE':''}`.toUpperCase(),RX,170+fs*.78+38);
-  const st=pick.stats.slice(0,4),cols=2,colW=RW/cols;st.forEach((s,i)=>{const x=RX+(i%cols)*colW,y=340+Math.floor(i/cols)*112;
+  c.font='800 20px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.72)';const sub=v.sub.toUpperCase();fitText(sub,RW,20,800,'Archivo, Arial, sans-serif');c.fillText(sub,RX,170+fs*.78+38);
+  const st=v.stats.slice(0,4),cols=2,colW=RW/cols;st.forEach((s,i)=>{const x=RX+(i%cols)*colW,y=340+Math.floor(i/cols)*112;
     c.fillStyle='#F2F5EF';fitText(fmt(s[1]),colW-24,88,700,'Teko, Arial Narrow, sans-serif');c.fillText(fmt(s[1]),x,y+50);
     c.font='800 17px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.7)';c.fillText(s[0].toUpperCase(),x,y+78)});
-  badges(honors(pick),RX,HT-128,WD-60);footerLine(RX)}
+  if(v.honors)badges(honors(pick),RX,HT-128,WD-60);else{c.font='800 16px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.55)';c.fillText('REGULAR SEASON',RX,HT-100)}footerLine(RX)}
 async function drawVs(my){
   const la=pick?LOGOS[pick.logo]:null,lb=pick2?LOGOS[pick2.logo]:null,ia=la?await img(la.img):null,ib=lb?await img(lb.img):null;if(my!==drawing)return;header();
   const hl=($('headline').value||'').toUpperCase();c.fillStyle='#F2F5EF';const fs=fitText(hl,WD-560,64,700,'Teko, Arial Narrow, sans-serif');c.textAlign='center';c.fillText(hl,WD/2,96+fs*.36);c.textAlign='left';
@@ -241,7 +267,7 @@ async function drawWeek(my){
   footerLine(60)}
 function finishDraw(){
   $('postBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(($('tweet').value||'')+(SITE?'\n\n'+SITE:''));
-  const nm=tpl==='week'?'week-'+W.week+'-best':tpl==='vs'?(pick&&pick2?norm(pick.name).replace(/ /g,'-')+'-vs-'+norm(pick2.name).replace(/ /g,'-'):'vs'):(pick?norm(pick.name).replace(/ /g,'-'):'graphic')+'-'+(tpl==='spot'?'spotlight':kind);
+  const nm=tpl==='week'?'week-'+W.week+'-best':tpl==='vs'?(pick&&pick2?norm(pick.name).replace(/ /g,'-')+'-vs-'+norm(pick2.name).replace(/ /g,'-'):'vs'):(pick?norm(pick.name).replace(/ /g,'-'):'graphic')+'-'+(tpl==='spot'?(scope==='career'?'career':scope==='season'?$('seasonSel').value:'wk'+((spotView()||{}).g||[0,0])[1]):kind);
   try{$('dlBtn').href=cv.toDataURL('image/png');$('dlBtn').download='clocked-'+nm+'.png'}catch(e){}}
 async function draw(){
   const my=++drawing;
