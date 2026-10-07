@@ -176,8 +176,10 @@ function facesOn(){return $('faces').checked}
 async function faceFor(p){return facesOn()?await photoOf(p):null}
 function blackout(bm){const o=document.createElement('canvas');o.width=bm.width;o.height=bm.height;const x=o.getContext('2d');x.drawImage(bm,0,0);x.globalCompositeOperation='source-in';x.fillStyle='#101C15';x.fillRect(0,0,o.width,o.height);return o}
 /* draw a face inside a box (caller has clipped). cut-outs sit on the bottom edge; photos are cropped to fill */
+const CROP=.8;
 function drawFace(ph,X,Y,W,H,dark){const bm=dark&&ph.cut?blackout(ph.bm):ph.bm,bw=ph.bm.width,bh=ph.bm.height;
-  if(ph.cut){const f=H*.98/bh,w=bw*f;c.drawImage(bm,X+(W-w)/2,Y+H-bh*f,w,bh*f)}
+  /* headshot cut-outs: drop the bottom of the image (jersey collar with the NFL shield) so no league logo shows */
+  if(ph.cut){const sh=bh*CROP,f=H*.98/sh,w=bw*f;c.drawImage(bm,0,0,bw,sh,X+(W-w)/2,Y+H-sh*f,w,sh*f)}
   else{const f=Math.max(W/bw,H/bh),w=bw*f,h=bh*f;c.drawImage(bm,X+(W-w)/2,Y+(H-h)*.22,w,h)}}
 function creditText(ph,x,y,maxW){if(!ph||ph.cut||!ph.credit)return;c.font='600 12px Archivo, Arial, sans-serif';c.fillStyle='rgba(255,255,255,.8)';let t=ph.credit;while(c.measureText(t).width>maxW&&t.length>10)t=t.slice(0,-2);c.fillText(t,x,y)}
 $('faces').addEventListener('change',draw);
@@ -197,11 +199,15 @@ function fillScope(){
   $('seasonSel').innerHTML=ss.slice().reverse().map(r=>`<option value="${r[0]}">${r[0]} · ${TNAMES[r[1]]}${r[4]>1?' +'+(r[4]-1):''}</option>`).join('')||'<option value="">No game logs (before 1999)</option>';
   $('gameSel').innerHTML=gg.slice().reverse().map((g,i)=>`<option value="${gg.length-1-i}">${g[0]} Wk ${g[1]} · ${g[5]?'vs':'at'} ${g[4]} · ${g[6]>g[7]?'W':g[6]<g[7]?'L':'T'} ${g[6]}-${g[7]}</option>`).join('')||'<option value="">No games this season or last</option>';
   paintScope()}
-function seasonOpts(p){return '<option value="">Career</option>'+seasonsOf(p).slice().reverse().map(r=>`<option value="${r[0]}">${r[0]} season · ${TNAMES[r[1]]}</option>`).join('')}
+function seasonOpts(p){const gg=gamesOf(p);return '<option value="">Career</option><optgroup label="Seasons">'+seasonsOf(p).slice().reverse().map(r=>`<option value="${r[0]}">${r[0]} season · ${TNAMES[r[1]]}</option>`).join('')+'</optgroup>'
+  +(gg.length?'<optgroup label="Games">'+gg.map((g,i)=>[g,i]).reverse().map(([g,i])=>`<option value="g${i}">${g[0]} Wk ${g[1]} · ${g[5]?'vs':'at'} ${g[4]} · ${g[6]>g[7]?'W':g[6]<g[7]?'L':'T'} ${g[6]}-${g[7]}</option>`).join('')+'</optgroup>':'')}
 let vsFor={A:null,B:null};
 function fillVs(){[['vsA','A',pick],['vsB','B',pick2]].forEach(([id,k,p])=>{const el=$(id),keep=vsFor[k]===(p&&p.id)?el.value:'';el.innerHTML=seasonOpts(p);el.value=[...el.options].some(o=>o.value===keep)?keep:'';vsFor[k]=p&&p.id})}
 ['vsA','vsB'].forEach(id=>$(id).addEventListener('change',()=>{touched.tweet=touched.tag=false;defaults();draw()}));
-function vsView(p,yr){if(!yr)return {logo:p.logo,sub:`${p.pos} · ${yrs(p)}`,stats:p.stats,career:true,label:p.name};const r=seasonsOf(p).find(r=>String(r[0])===yr);
+function vsView(p,yr){
+  if(yr&&yr[0]==='g'){const g=gamesOf(p)[+yr.slice(1)],res=g[6]>g[7]?'W':g[6]<g[7]?'L':'T';
+    return {logo:g[3],sub:`WK ${g[1]} · ${g[0]} · ${g[5]?'vs':'at'} ${g[4]} · ${res} ${g[6]}-${g[7]}`,stats:p.stats.map((s,i)=>[s[0],g[8+i]]),career:false,label:`${p.name} (Week ${g[1]})`}}
+  if(!yr)return {logo:p.logo,sub:`${p.pos} · ${yrs(p)}`,stats:p.stats,career:true,label:p.name};const r=seasonsOf(p).find(r=>String(r[0])===yr);
   return {logo:r[2],sub:`${r[0]} · ${TNAMES[r[1]]}`,stats:p.stats.map((s,i)=>[s[0],r[5+i]]),career:false,label:r[0]+' '+p.name}}
 function scoped(){return tpl==='spot'||(tpl==='puzzle'&&src==='player')}
 function paintScope(){$('seasonWrap').hidden=!scoped()||scope!=='season';$('gameWrap').hidden=!scoped()||scope!=='game';const sg=$('scopeSeg');if(sg)sg.parentElement.hidden=!scoped()}
