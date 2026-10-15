@@ -197,10 +197,14 @@ const gamesOf=p=>p&&p.id?(GAMES[p.id]||[]):[];
 function fillScope(){
   const ss=seasonsOf(pick),gg=gamesOf(pick);
   $('seasonSel').innerHTML=ss.slice().reverse().map(r=>`<option value="${r[0]}">${r[0]} · ${TNAMES[r[1]]}${r[4]>1?' +'+(r[4]-1):''}</option>`).join('')||'<option value="">No game logs (before 1999)</option>';
-  $('gameSel').innerHTML=gg.slice().reverse().map((g,i)=>`<option value="${gg.length-1-i}">${g[0]} Wk ${g[1]} · ${g[5]?'vs':'at'} ${g[4]} · ${g[6]>g[7]?'W':g[6]<g[7]?'L':'T'} ${g[6]}-${g[7]}</option>`).join('')||'<option value="">No games this season or last</option>';
+  $('gameSel').innerHTML=gameOpts(gg,'')||'<option value="">No big games on record (logs start 1999)</option>';
   paintScope()}
 function seasonOpts(p){const gg=gamesOf(p);return '<option value="">Career</option><optgroup label="Seasons">'+seasonsOf(p).slice().reverse().map(r=>`<option value="${r[0]}">${r[0]} season · ${TNAMES[r[1]]}</option>`).join('')+'</optgroup>'
-  +(gg.length?'<optgroup label="Games">'+gg.map((g,i)=>[g,i]).reverse().map(([g,i])=>`<option value="g${i}">${g[0]} Wk ${g[1]} · ${g[5]?'vs':'at'} ${g[4]} · ${g[6]>g[7]?'W':g[6]<g[7]?'L':'T'} ${g[6]}-${g[7]}</option>`).join('')+'</optgroup>':'')}
+  +gameOpts(gg,'g')}
+/* games grouped by season, newest first. Last two seasons have every game; older seasons only the big ones */
+function gameOpts(gg,pre){const RECENT=(DATA.W&&DATA.W.season||0)-1,by={};gg.forEach((g,i)=>(by[g[0]]=by[g[0]]||[]).push(i));
+  return Object.keys(by).sort((a,b)=>b-a).map(y=>`<optgroup label="${y} ${+y>=RECENT?'games':'big games'}">`+by[y].reverse().map(i=>{const g=gg[i];
+    return `<option value="${pre}${i}">${g[0]} Wk ${g[1]} · ${g[5]?'vs':'at'} ${g[4]} · ${g[6]>g[7]?'W':g[6]<g[7]?'L':'T'} ${g[6]}-${g[7]}</option>`}).join('')+'</optgroup>').join('')}
 let vsFor={A:null,B:null};
 function fillVs(){[['vsA','A',pick],['vsB','B',pick2]].forEach(([id,k,p])=>{const el=$(id),keep=vsFor[k]===(p&&p.id)?el.value:'';el.innerHTML=seasonOpts(p);el.value=[...el.options].some(o=>o.value===keep)?keep:'';vsFor[k]=p&&p.id})}
 ['vsA','vsB'].forEach(id=>$(id).addEventListener('change',()=>{touched.tweet=touched.tag=false;defaults();draw()}));
