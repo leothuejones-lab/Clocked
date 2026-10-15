@@ -366,7 +366,12 @@ if os.path.exists(stpl):
             tm = vc.index[0]; tname = team(tm, int(se))
             rows.append([int(se), tn(tname), LOGO[tname], int(len(y)), y.team.nunique()] + [num(y[c].sum()) for c in cols])
         SEAS[pid] = rows
-        rec = x[x.season >= SEASON - 1].sort_values(['season', 'week'])
+        # Recent two seasons: every game. Older (1999+): only the big games, so 'on this day' posts work
+        # without making the page huge.
+        ppr = (x.passing_yards * .04 + x.passing_tds * 4 - x.passing_interceptions * 2 + (x.rushing_yards + x.receiving_yards) * .1
+               + (x.rushing_tds + x.receiving_tds) * 6 + x.receptions)
+        big = (ppr >= 25) | (x.def_sacks >= 2) | (x.def_interceptions >= 2)
+        rec = x[(x.season >= SEASON - 1) | big].sort_values(['season', 'week'])
         if len(rec):
             out = []
             for r in rec.itertuples():
