@@ -291,7 +291,8 @@ const CAREER=[
 ];
 
 const WEEKC=[
-  ['Week '+DATA.W.week,p=>`<div class="stats">${p.line.map(t=>{const m=t.match(/^([\d.\/]+)\s+(.*)$/);return m?`<div class="stat"><b>${m[1]}</b><span>${m[2]}</span></div>`:t}).join('')}</div><div class="sm">${p.home?'vs':'at'} ${OPP[p.opp]} · ${p.score[0]>p.score[1]?'W':p.score[0]<p.score[1]?'L':'T'} ${p.score[0]}–${p.score[1]}</div>`],
+  ['Week '+DATA.W.week,p=>`<div class="stats">${p.line.map(t=>{const m=t.match(/^([\d.\/]+)\s+(.*)$/);return m?`<div class="stat"><b>${m[1]}</b><span>${m[2]}</span></div>`:t}).join('')}</div>`],
+  ['Matchup',p=>`${p.home?'vs':'at'} ${OPP[p.opp]} · ${p.score[0]>p.score[1]?'W':p.score[0]<p.score[1]?'L':'T'} ${p.score[0]}–${p.score[1]}`],
   ['College',p=>p.college||'None listed'],
   [(DATA.W.season||SEASON)+' season',p=>statRow(p.season)],
   ['Entered NFL',p=>p.draft?`${p.draft[0]} draft, round ${p.draft[1]}, ${ord(p.draft[2])} overall`:`${p.rookie||'?'}, undrafted`],
@@ -299,11 +300,14 @@ const WEEKC=[
 ];
 const OPP={ARI:'Arizona',ATL:'Atlanta',BAL:'Baltimore',BUF:'Buffalo',CAR:'Carolina',CHI:'Chicago',CIN:'Cincinnati',CLE:'Cleveland',DAL:'Dallas',DEN:'Denver',DET:'Detroit',GB:'Green Bay',HOU:'Houston',IND:'Indianapolis',JAX:'Jacksonville',KC:'Kansas City',LA:'LA Rams',LAC:'LA Chargers',LV:'Las Vegas',MIA:'Miami',MIN:'Minnesota',NE:'New England',NO:'New Orleans',NYG:'NY Giants',NYJ:'NY Jets',PHI:'Philadelphia',PIT:'Pittsburgh',SEA:'Seattle',SF:'San Francisco',TB:'Tampa Bay',TEN:'Tennessee',WAS:'Washington'};
 const WK={};DATA.W.lines.forEach((l,i)=>{l.key='w'+i;WK[l.key]=l});
-const WKSORT=Object.keys(WK).sort((a,b)=>WK[b].score_key-WK[a].score_key);
+/* last-week pool: best lines per position group, dealt round-robin so every tier mixes in defense (not 12 QBs up top) */
+const WKSORT=(()=>{const by={};Object.keys(WK).forEach(k=>(by[WK[k].pg]=by[WK[k].pg]||[]).push(k));Object.values(by).forEach(a=>a.sort((x,y)=>WK[y].score_key-WK[x].score_key));
+  const order=['DL','WR','LB','RB','DB','TE','QB'].concat(Object.keys(by).filter(g=>!['DL','WR','LB','RB','DB','TE','QB'].includes(g))),out=[];
+  for(let r=0;out.length<Object.keys(WK).length;r++)for(const g of order)if(by[g]&&by[g][r])out.push(by[g][r]);return out})();
 const DIFF={
   easy:{label:'Easy',act:p=>p.pb>=4,ret:p=>p.hof||p.pb>=7,wk:25,start:2,mc:1,logo:true},
-  medium:{label:'Medium',act:p=>p.pb>=3,ret:p=>p.hof||p.pb>=5,wk:50,start:1,mc:3,logo:true},
-  hard:{label:'Hard',act:p=>p.pb>=2||p.ap>=1,ret:p=>p.hof||p.pb>=3,wk:999,start:1,mc:99,logo:true},
+  medium:{label:'Medium',act:p=>p.pb>=3,ret:p=>p.hof||p.pb>=5,wk:50,start:1,mc:3,logo:false,logoAt:2},
+  hard:{label:'Hard',act:p=>true,ret:p=>p.hof||p.pb>=3,wk:999,start:1,mc:99,logo:false,logoAt:3},
   die:{label:'Diehard',act:p=>true,ret:p=>true,wk:999,start:1,mc:99,logo:false}};
 let diff=(store.get('mp2-diff')in DIFF)?store.get('mp2-diff'):'medium';
 const SEEDS={act:2026,ret:1985,week:404},DSEED={easy:11,medium:22,hard:33,die:44};
@@ -561,7 +565,7 @@ function showHelp(){openSheet(`<h3>How to play</h3>
    <div class="ex"><span class="chip m">2015 ↑</span> debut year (arrow points toward his)</div>
    <p>Your share grid: 🟩 got him, 🟨 right team or position, 🟥 miss, ⬜ skip.</p>
    <p><b>Clocked #</b>: one player a day, the same for everyone. The team logo stays hidden until your 3rd miss. New one at midnight ET.</p>
-   <p><b>Practice</b>: extra players from Active, Retired or Last week, 6 per pool a day. Easy = biggest stars with multiple choice; Medium = stars; Hard = every Pro Bowler, no help; Diehard = logo hidden the whole way.</p>
+   <p><b>Practice</b>: extra players from Active, Retired or Last week, 6 per pool a day. Easy = biggest stars with multiple choice and the logo showing; Medium = stars, logo after 2 misses; Hard = every Pro Bowler, logo after 3 misses; Diehard = logo hidden the whole way.</p>
   </div>
   <div class="actions"><button class="btn" data-close><span>Play</span></button></div>`)}
 function openSheet(html){$('panel').innerHTML=html;$('sheet').hidden=false;const c=$('panel').querySelector('[data-close]');c&&c.focus()}
