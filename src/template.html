@@ -363,7 +363,9 @@ async function setPhoto(p){
   fallback();
 }
 function paintCredit(){const c=$('credit');if(!c)return;const on=!!(photoCredit&&state&&state.done);c.hidden=!on;if(on)c.href='https://commons.wikimedia.org/wiki/File:'+encodeURIComponent(photoCredit)}
-function load(){
+/* remember where you were for this tab only, so a reload keeps you in practice but a fresh visit opens today's Clocked */
+const view={get(){try{return JSON.parse(sessionStorage.getItem('clk-view'))}catch(e){return null}},set(v){try{sessionStorage.setItem('clk-view',JSON.stringify(v))}catch(e){}}};
+function load(){if(!CHID)view.set({m:mode,p:pool,d:diff});
   const d=dayIdx();
   CLUES=pool==='week'?WEEKC:CAREER;
   const get=k=>pool==='week'?WK[k]:A[k];
@@ -527,8 +529,12 @@ const LIMIT=6;
 function CK(){return 'clk-cur-'+pool+'-'+diff}
 function cnt(pl){const d=dayIdx(),c=store.get('clk-cnt-'+(pl||pool));return c&&c.day===d?c:{day:d,seen:[]}}
 function count(tag){const c=cnt();if(!c.seen.includes(tag)){c.seen.push(tag);store.set('clk-cnt-'+pool,c)}}
-function left(pl){return Math.max(0,LIMIT-cnt(pl).seen.length)}
-function paintLimits(){if(mode==='special'){$('left').textContent=CHID?'Challenge · free, doesn\'t use your 6':(showLogo()?'Same player for everyone today':'Team logo unlocks after 3 misses');return}const n=left();$('left').textContent=`${n} of ${LIMIT} ${PN[pool]} players left today`+(mode==='daily'?' · daily':'')}
+/* dev unlock: open the site with #dev=<code> once on a device to lift the 6-a-day practice limit there; #dev=off turns it off */
+const DEVH='0f78112657ef40decb23ddbeb6fd43d014e57c523d2d377839b47829f02322be';const isDev=()=>store.get('clk-dev')===1;
+{const m=location.hash.match(/^#dev=(.+)$/);if(m){const c=decodeURIComponent(m[1]),clear=()=>{try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}};
+  if(c==='off'){store.set('clk-dev',0);clear()}else if(window.crypto&&crypto.subtle)crypto.subtle.digest('SHA-256',new TextEncoder().encode(c)).then(b=>{const h=[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');if(h===DEVH){store.set('clk-dev',1);clear();if(mode==='practice')load();else paintLimits()}})}}
+function left(pl){return isDev()?99:Math.max(0,LIMIT-cnt(pl).seen.length)}
+function paintLimits(){if(mode==='special'){$('left').textContent=CHID?'Challenge · free, doesn\'t use your 6':(showLogo()?'Same player for everyone today':'Team logo unlocks after 3 misses');return}if(isDev()){$('left').textContent='Dev mode · unlimited';return}const n=left();$('left').textContent=`${n} of ${LIMIT} ${PN[pool]} players left today`+(mode==='daily'?' · daily':'')}
 function showLimit(){
   ['card','clues','guesses','play','mc'].forEach(id=>$(id).hidden=true);
   $('title').textContent=`Practice · ${PN[pool]} · ${DIFF[diff].label}`;
@@ -650,6 +656,7 @@ $('srcnote').innerHTML=`Last week: notable lines from completed ${DATA.W.season|
 window.addEventListener('hashchange',()=>location.reload());
 /* the front page IS today's Clocked; practice is one tap away */
 prePool=pool;preDiff=diff;mode='special';
+{const v=view.get();if(!CHID&&v&&v.m==='practice'){if(v.p==='week'||POOLS[v.p])pool=v.p;if(DIFF[v.d]&&!['special','chal'].includes(v.d))diff=v.d;mode='practice'}}
 load();
 if(!store.get('clk-help-seen')&&!CHID){store.set('clk-help-seen',1);showHelp()}
 </script>
