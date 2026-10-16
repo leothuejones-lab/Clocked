@@ -487,7 +487,8 @@ function shareText(){
   const tag='Practice';
   const who=showName&&state.done?(state.won?`I clocked ${ans.name} in ${state.guesses.length}/${MAX}`:`${ans.name} juked me`):`${state.won?state.guesses.length:'X'}/${MAX}`;
   return `Clocked ⏱️ ${PN[pool]} · ${DIFF[diff].label} ${tag}\n${who} ${cells}`}
-function linkURL(){return SHARE_URL?SHARE_URL+(mode==='special'?(CHID?'/#c='+chEnc(CHID):''):''):''}
+/* daily links carry the puzzle number (/?12) so X fetches a fresh preview card each day instead of a stale cached one */
+function linkURL(){return SHARE_URL?SHARE_URL+(mode==='special'?(CHID?'/#c='+chEnc(CHID):'/?'+specialInfo().num):''):''}
 function tweetURL(){return 'https://twitter.com/intent/tweet?text='+encodeURIComponent(shareText()+(linkURL()?'\n\n'+linkURL():''))}
 function specialTweetURL(){const sp=specialInfo();return 'https://twitter.com/intent/tweet?text='+encodeURIComponent((CHID?`Clocked Challenge ⏱️ Diehard rules, no logo\nCan you clock him? 👇`:`Clocked #${sp.num} ⏱️ ${sp.theme}\nCan you clock today's player? 👇`)+(linkURL()?'\n\n'+linkURL():''))}
 function copyText(t,msg){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>toast(msg),()=>toast(t));else toast(t)}
