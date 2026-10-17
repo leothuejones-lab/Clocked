@@ -59,7 +59,7 @@ select{padding:8px 10px}
 <div class="wrap">
   <div class="panel">
     <div><h1>Clock<span>ed</span> Studio</h1><div class="note">Private creator tool. Not linked from the game.</div></div>
-    <div class="tpl" id="tplSeg"><button data-t="puzzle" aria-pressed="true">Puzzle<small>Who is this? / reveal</small></button><button data-t="spot" aria-pressed="false">Spotlight<small>One player, by the numbers</small></button><button data-t="vs" aria-pressed="false">Head-to-head<small>Who ya got?</small></button><button data-t="week" aria-pressed="false">Week's best<small>Top lines from Week <span id="wkN"></span></small></button></div>
+    <div class="tpl" id="tplSeg"><button data-t="puzzle" aria-pressed="true">Puzzle<small>Who is this? / reveal</small></button><button data-t="spot" aria-pressed="false">Spotlight<small>One player, by the numbers</small></button><button data-t="vs" aria-pressed="false">Head-to-head<small>Who ya got?</small></button><button data-t="week" aria-pressed="false">Week's best<small>Top lines from Week <span id="wkN"></span></small></button><button data-t="daily" aria-pressed="false">Daily<small>Today's Clocked post</small></button></div>
     <div data-for="puzzle"><div class="seg" id="srcSeg"><button data-s="player" aria-pressed="true">Any player</button><button data-s="week" aria-pressed="false">Last week line</button></div></div>
     <label class="search" for="q" data-for="puzzle spot vs"><span id="qLabel">Search</span><input id="q" type="text" placeholder="Type a name" autocomplete="off"><ul class="sugg" id="sugg" hidden></ul></label>
     <div class="picked" id="picked" data-for="puzzle spot vs">Nothing picked yet.</div>
@@ -71,6 +71,7 @@ select{padding:8px 10px}
     <div data-for="puzzle spot"><div class="seg" id="scopeSeg"><button data-c="career" aria-pressed="true">Career</button><button data-c="season" aria-pressed="false">Season</button><button data-c="game" aria-pressed="false">Game</button></div></div>
     <label for="seasonSel" data-for="puzzle spot" id="seasonWrap" hidden>Season<select id="seasonSel"></select></label>
     <label for="gameSel" data-for="puzzle spot" id="gameWrap" hidden>Game<select id="gameSel"></select></label>
+    <label for="dayOff" data-for="daily">Which day<select id="dayOff"><option value="0">Today</option><option value="1">Tomorrow</option><option value="2">In 2 days</option></select></label>
     <label for="wcount" data-for="week">How many<select id="wcount"><option>3</option><option>4</option><option selected>5</option></select></label>
     <div data-for="puzzle"><div class="seg" id="kindSeg"><button data-k="mystery" aria-pressed="true">Mystery</button><button data-k="reveal" aria-pressed="false">Reveal</button></div></div>
     <label for="headline">Headline<input id="headline" type="text"></label>
@@ -208,6 +209,7 @@ function gameOpts(gg,pre){const RECENT=(DATA.W&&DATA.W.season||0)-1,by={};gg.for
 let vsFor={A:null,B:null};
 function fillVs(){[['vsA','A',pick],['vsB','B',pick2]].forEach(([id,k,p])=>{const el=$(id),keep=vsFor[k]===(p&&p.id)?el.value:'';el.innerHTML=seasonOpts(p);el.value=[...el.options].some(o=>o.value===keep)?keep:'';vsFor[k]=p&&p.id})}
 ['vsA','vsB'].forEach(id=>$(id).addEventListener('change',()=>{touched.tweet=touched.tag=false;defaults();draw()}));
+$('dayOff').addEventListener('change',()=>{touched={headline:false,footer:false,tag:false,tweet:false};defaults();draw()});
 function vsView(p,yr){
   if(yr&&yr[0]==='g'){const g=gamesOf(p)[+yr.slice(1)],res=g[6]>g[7]?'W':g[6]<g[7]?'L':'T';
     return {logo:g[3],sub:`WK ${g[1]} · ${g[0]} · ${g[5]?'vs':'at'} ${g[4]} · ${res} ${g[6]}-${g[7]}`,stats:p.stats.map((s,i)=>[s[0],g[8+i]]),career:false,label:`${p.name} (Week ${g[1]})`}}
@@ -224,9 +226,16 @@ function spotView(){
     return {logo:g[3],kicker:`WEEK ${g[1]} · ${g[0]}`,sub:`${p.pos} · ${g[2]} ${g[5]?'VS':'AT'} ${g[4]} · ${res} ${g[6]}-${g[7]}`,stats:labels.map((l,i)=>[l,g[8+i]]),honors:false,g}}
   return {logo:p.logo,kicker:null,sub:`${p.pos} · ${yrs(p)} · ${fmt(p.games)} GAMES${p.active?' · ACTIVE':''}`,stats:p.stats,honors:true}}
 
+/* ---------- Daily: same numbering + weekday themes as the game (Clocked #1 = Oct 5 2026, Eastern time) ---------- */
+const D_THEMES=[['Sunday Star','A star you should know. Do you?'],['Monday Mystery','Fresh week, fresh mystery player.'],['Tuesday Mystery','One player. Six guesses.'],['Last Week Line','Clock him from last week\'s stat line.'],['Throwback Thursday','A retired legend. How far back can you go?'],['Final Boss Friday','Hardest one of the week.'],['Saturday Showdown','A Pro Bowler. No logo until 3 misses.']];
+function dailyInfo(){const off=+($('dayOff')&&$('dayOff').value||0);let s;try{s=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York'}).format(new Date())}catch(e){s=new Date().toISOString().slice(0,10)}
+  const dt=new Date(Date.parse(s+'T12:00:00Z')+off*864e5),num=Math.max(0,Math.round((dt-Date.UTC(2026,9,5,12))/864e5))+1,t=D_THEMES[dt.getUTCDay()];return {num,theme:t[0],blurb:t[1]}}
+const linkFor=()=>SITE?(tpl==='daily'?SITE+'/?'+dailyInfo().num:SITE):'';
 /* ---------- defaults ---------- */
 function defaults(){
   const set=(id,v)=>{if(!touched[id])$(id).value=v};
+  if(tpl==='daily'){const d=dailyInfo();set('headline','CLOCKED #'+d.num);set('tag','DAILY PUZZLE');set('footer',d.blurb);
+    set('tweet',`Clocked #${d.num} ⏱️ ${d.theme}\n${d.blurb}\nCan you clock him? Post your grid 👇`);return}
   if(tpl==='spot'){const v=pick?spotView():null;set('headline',pick?pick.name.toUpperCase():'PLAYER SPOTLIGHT');set('footer','Play daily at '+siteShort);
     set('tag',v&&v.kicker?v.kicker:pick&&pick.hof?'HALL OF FAME':'BY THE NUMBERS');
     set('tweet',!pick?'':scope==='season'&&v?`${pick.name}${/s$/.test(pick.name)?"'":"'s"} ${v.yr} season 📊\nWhere does it rank? 👇`:scope==='game'&&v?`${pick.name} in Week ${v.g[1]} ${v.g[5]?'vs':'at'} ${OPP[v.g[4]]||v.g[4]} 🔥\nRate it 1-10 👇`:`${pick.name}, by the numbers 📊\nUnderrated or overrated? 👇`);return}
@@ -316,6 +325,24 @@ async function drawVs(my){
     c.textAlign='right';c.fillStyle=r.win==='l'?'#FFD23F':r.win==='r'?'rgba(242,245,239,.55)':'#F2F5EF';c.fillText(r.l,WD/2-150,y);
     c.textAlign='left';c.fillStyle=r.win==='r'?'#FFD23F':r.win==='l'?'rgba(242,245,239,.55)':'#F2F5EF';c.fillText(r.r,WD/2+150,y)});
   c.textAlign='left';footerLine(WD/2,'center')}
+async function drawDaily(my){if(my!==drawing)return;header();const d=dailyInfo();
+  const sg=c.createRadialGradient(900,330,20,900,330,420);sg.addColorStop(0,'rgba(255,210,63,.5)');sg.addColorStop(.45,'rgba(255,210,63,.16)');sg.addColorStop(1,'rgba(255,210,63,0)');c.fillStyle=sg;c.fillRect(0,0,WD,HT);
+  const hl=($('headline').value||'').toUpperCase(),parts=hl.match(/^(.*?)(#\d+)$/);c.fillStyle='#F2F5EF';
+  c.font='700 54px Teko, Arial Narrow, sans-serif';const th=d.theme.toUpperCase(),tw=c.measureText(th).width+40;slab(60,170,tw,64,'#FFD23F');c.fillStyle='#101C15';c.fillText(th,80,222);
+  c.fillStyle='#F2F5EF';const big=parts?parts[2]:hl;fitText(big,620,250,700,'Teko, Arial Narrow, sans-serif');c.fillText(big,52,440);
+  c.font='700 30px Archivo, Arial, sans-serif';c.fillStyle='#F2F5EF';c.fillText('Can you clock today\'s player?',60,488);
+  c.font='600 24px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.78)';c.fillText(($('footer').value||'').slice(0,60),60,526);
+  let gx=60;for(let i=0;i<6;i++){rr(gx,560,46,46,8);c.fillStyle='rgba(242,245,239,.14)';c.fill();c.strokeStyle='rgba(242,245,239,.35)';c.lineWidth=2;c.stroke();gx+=56}
+  c.font='700 44px Teko, Arial Narrow, sans-serif';c.fillStyle='#F2F5EF';c.fillText('?/6',gx+8,600);
+  c.save();c.translate(905,352);c.rotate(.05);const CW=360,CH=420,X=-CW/2,Y=-CH/2;
+  c.shadowColor='rgba(0,0,0,.55)';c.shadowBlur=40;c.shadowOffsetY=18;rr(X,Y,CW,CH,24);c.fillStyle='#173322';c.fill();c.shadowColor='transparent';
+  c.save();rr(X,Y,CW,CH,24);c.clip();const g=c.createLinearGradient(0,Y,0,Y+CH);g.addColorStop(0,'#3a6a52');g.addColorStop(1,'#13291c');c.fillStyle=g;c.fillRect(X,Y,CW,CH);
+  c.strokeStyle='rgba(255,255,255,.06)';c.lineWidth=2;for(let i=-CH;i<CW+CH;i+=24){c.beginPath();c.moveTo(X+i,Y+CH);c.lineTo(X+i+CH*.47,Y);c.stroke()}
+  c.fillStyle='#FFD23F';c.beginPath();c.moveTo(X+26,Y+CH);c.ellipse(0,Y+CH-26,CW/2-26,116,0,Math.PI,0);c.lineTo(X+CW-26,Y+CH);c.fill();c.beginPath();c.ellipse(0,Y+180,68,82,0,0,Math.PI*2);c.fill();
+  c.fillStyle='#0E1A13';c.beginPath();c.moveTo(X+32,Y+CH);c.ellipse(0,Y+CH-22,CW/2-32,112,0,Math.PI,0);c.lineTo(X+CW-32,Y+CH);c.fill();c.beginPath();c.ellipse(0,Y+182,63,77,0,0,Math.PI*2);c.fill();
+  c.font='700 112px Teko, Arial Narrow, sans-serif';c.fillStyle='#FFD23F';c.textAlign='center';c.fillText('?',0,Y+226);c.textAlign='left';c.restore();
+  c.strokeStyle='#FFD23F';c.lineWidth=5;rr(X,Y,CW,CH,24);c.stroke();c.restore();
+  c.font='800 20px Archivo, Arial, sans-serif';c.fillStyle='rgba(242,245,239,.8)';c.textAlign='right';c.fillText(siteShort,WD-60,HT-30);c.textAlign='left'}
 async function drawWeek(my){
   const rows=weekRows(),lis=await Promise.all(rows.map(r=>LOGOS[r.team]?img(LOGOS[r.team].img):null)),phs=await Promise.all(rows.map(r=>faceFor(PBY[r.id])));if(my!==drawing)return;header();
   const hl=($('headline').value||'').toUpperCase();c.fillStyle='#F2F5EF';const fs=fitText(hl,WD-120,76,700,'Teko, Arial Narrow, sans-serif');c.fillText(hl,60,150+fs*.75);
@@ -330,13 +357,13 @@ async function drawWeek(my){
     const ln=r.line.join(' · ');c.fillStyle='#F2F5EF';fitText(ln,WD-60-(nx+360),Math.round(rh*.46),600,'Teko, Arial Narrow, sans-serif');c.textAlign='right';c.fillText(ln,WD-80,mid+rh*.16);c.textAlign='left'});
   footerLine(60)}
 function finishDraw(){setTimeout(prepShare);
-  $('postBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(($('tweet').value||'')+(SITE?'\n\n'+SITE:''));
-  const nm=tpl==='week'?'week-'+W.week+'-best':tpl==='vs'?(pick&&pick2?norm(pick.name).replace(/ /g,'-')+'-vs-'+norm(pick2.name).replace(/ /g,'-'):'vs'):(pick?norm(pick.name).replace(/ /g,'-'):'graphic')+'-'+(tpl==='spot'?(scope==='career'?'career':scope==='season'?$('seasonSel').value:'wk'+((spotView()||{}).g||[0,0])[1]):kind);
+  $('postBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(($('tweet').value||'')+(linkFor()?'\n\n'+linkFor():''));
+  const nm=tpl==='daily'?'daily-'+dailyInfo().num:tpl==='week'?'week-'+W.week+'-best':tpl==='vs'?(pick&&pick2?norm(pick.name).replace(/ /g,'-')+'-vs-'+norm(pick2.name).replace(/ /g,'-'):'vs'):(pick?norm(pick.name).replace(/ /g,'-'):'graphic')+'-'+(tpl==='spot'?(scope==='career'?'career':scope==='season'?$('seasonSel').value:'wk'+((spotView()||{}).g||[0,0])[1]):kind);
   try{$('dlBtn').href=cv.toDataURL('image/png');$('dlBtn').download='clocked-'+nm+'.png'}catch(e){}}
 async function draw(){
   const my=++drawing;
   try{await Promise.all(['700 96px Teko','600 40px Teko','800 24px Archivo','600 24px Archivo'].map(f=>document.fonts.load(f)))}catch(e){}
-  if(tpl!=='puzzle'){await (tpl==='spot'?drawSpot:tpl==='vs'?drawVs:drawWeek)(my);if(my===drawing)finishDraw();return}
+  if(tpl!=='puzzle'){await (tpl==='spot'?drawSpot:tpl==='vs'?drawVs:tpl==='daily'?drawDaily:drawWeek)(my);if(my===drawing)finishDraw();return}
   const pv=pick&&src==='player'?spotView():null;
   const lg=pick?LOGOS[pv?pv.logo:(pick.logo||pick.team)]:null;
   const li=lg&&$('showLogo').checked?await img(lg.img):null;
@@ -399,7 +426,7 @@ $('copyBtn').onclick=()=>copyImg(false);
 let shareFile=null;
 function prepShare(){shareFile=null;try{cv.toBlob(b=>{if(b)shareFile=new File([b],($('dlBtn').download||'clocked.png'),{type:'image/png'})},'image/png')}catch(e){}}
 $('postBtn').addEventListener('click',e=>{
-  const text=($('tweet').value||'')+(SITE?'\n\n'+SITE:'');
+  const text=($('tweet').value||'')+(linkFor()?'\n\n'+linkFor():'');
   if(tpl!=='puzzle'&&shareFile&&navigator.canShare&&navigator.canShare({files:[shareFile]})){e.preventDefault();navigator.share({files:[shareFile],text}).catch(()=>{});return}
   copyImg(true)});
 const shareOK=(()=>{try{return !!(navigator.canShare&&navigator.canShare({files:[new File([new Blob(['x'],{type:'image/png'})],'t.png',{type:'image/png'})]}))}catch(e){return false}})();
