@@ -37,3 +37,5 @@ npm install
 pip install -r requirements.txt
 SITE_URL=https://playclocked.com npm run build
 ```
+
+Live at https://playclocked.pages.dev
